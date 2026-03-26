@@ -22,4 +22,23 @@ class RetrieverBuilder:
     
     def build_hybrid_retrievers(self,docs: List[Document]) -> EnsembleRetriever:
         """Build a BM25 + Chroma Ensemble Retriever"""
-        pass 
+        try:
+            vector_store = Chroma.from_documents(documents=docs,
+                                                 embedding=self.embeddings,
+                                                 persist_directory=settings.CHROMA_DB_PATH,
+                                                 collection_name=settings.CHROMA_COLLECTION_NAME)
+            logger.info("Chroma vector store created")
+
+            bm25 = BM25Retriever.from_documents(docs)
+            bm25.k = settings.VECTOR_SEARCH_K
+            logger.info("BM-25 retriever created")
+
+            vector_retriever = vector_store.as_retriever(search_kwargs={"k":settings.VECTOR_SEARCH_K})
+            hybrid = EnsembleRetriever(retrievers=[bm25,vector_retriever],
+                                       weights=settings.HYBRID_RETRIEVER_WEIGHTS)
+            logger.info("Hybrid retriever ready")
+            return hybrid
+
+        except Exception as e:
+            logger.error(f"Failed to build hybrid retriever:{e}")
+            raise
