@@ -1,5 +1,7 @@
 from typing import List, Dict
 from pydantic import BaseModel, Field
+import asyncio 
+from tenacity import retry,stop_after_attempt,wait_exponential
 
 from langchain_openai import ChatOpenAI
 from langchain_core.documents import Document
@@ -34,19 +36,17 @@ Return only structured output.
 
 
 class VerificationAgent:
-
     MAX_DOCS = 4
     MAX_CHARS = 400
+    TIMEOUT = 30
 
 
-    def __init__(self):
+    def __init__(self,llm=None):
 
-        llm = ChatOpenAI(
-            model=settings.VERIFY_MODEL,
-            temperature=0,
-            max_tokens=settings.VERIFY_MAX_TOKENS,
-            api_key=settings.OPENAI_API_KEY
-        )
+        llm = llm or ChatOpenAI(model=settings.VERIFY_MODEL,
+                                temperature=0,
+                                max_tokens=settings.VERIFY_MAX_TOKENS,
+                                api_key=settings.OPENAI_API_KEY)
 
         prompt = ChatPromptTemplate.from_messages([
 
@@ -67,9 +67,15 @@ class VerificationAgent:
             prompt
             | llm.with_structured_output(VerificationResult)
         )
+    
+    @retry(stop=stop_after_attempt(3),
+           wait=wait_exponential(min=1,max=8))
+    async def _call_llm(self,payload: Dict) -> VerificationResult:
+        return await asyncio.wait_for(self.chain.ainvoke(payload),
+                                      timeout=self.TIMEOUT)
 
 
-    def check(self,
+    async def check(self,
               answer: str,
               documents: List[Document]) -> Dict:
 
@@ -77,22 +83,11 @@ class VerificationAgent:
 
         try:
 
-            result: VerificationResult = (
-                self.chain.invoke({
-                    "answer": answer,
-                    "context": context
-                })
-            )
-
+            result = await self._call_llm({"answer":answer,
+                                     "context":context})
         except Exception as e:
-
-            logger.error(
-                f"VerificationAgent error: {e}"
-            )
-
-            raise RuntimeError(
-                "Verification failed"
-            ) from e
+            logger.error(f"VerificationAgent error: {e}")
+            raise RuntimeError("Verification failed") from e
 
 
         report = self._format(result)
