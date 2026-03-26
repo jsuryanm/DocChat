@@ -59,7 +59,7 @@ class DocumentProcessor:
                 logger.error(f"Failed to process {path}:{e}")
                 continue
 
-            logger.info(f"Total unique chunks: {len(all_chunks)}")
+        logger.info(f"Total unique chunks: {len(all_chunks)}")
         
         return all_chunks 
     
@@ -81,18 +81,17 @@ class DocumentProcessor:
         # creates a cryptographic hash of content 
         return hashlib.sha256(content).hexdigest()
     
-    def _is_cache_valid(self,chunks: List[Document],cache_path: Path) -> None:
+    def _is_cache_valid(self,cache_path: Path) -> bool:
         if not cache_path.exists():
             return False
-        
         age = datetime.now() - datetime.fromtimestamp(cache_path.stat().st_mtime)
-        return age < timedelta(day=settings.CACHE_EXPIRE_DAYS) 
+        return age < timedelta(days=settings.CACHE_EXPIRE_DAYS) 
     
     def _load_from_cache(self,cache_path: Path) -> List[Document]:
         with open(cache_path,"rb") as f:
             return pickle.load(f)['chunks']
         
-    def _save_to_cache(self,chunks: List[Document],cache_path: Path) -> bool:
+    def _save_to_cache(self,chunks: List[Document],cache_path: Path) -> None:
         with open(cache_path,"wb") as f:
             pickle.dump({"timestamp":datetime.now().timestamp(),
                          "chunks":chunks},f)

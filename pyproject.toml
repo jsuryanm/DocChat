@@ -8,6 +8,7 @@ dependencies = [
     "chromadb>=1.5.5",
     "docling>=2.82.0",
     "groq>=0.37.1",
+    "huggingface-hub[hf-xet]>=0.36.2",
     "langchain>=1.2.13",
     "langchain-chroma>=1.1.0",
     "langchain-classic>=1.0.3",
