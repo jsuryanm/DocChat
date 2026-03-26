@@ -1,14 +1,14 @@
 langchain
 langchain-core
 langchain-community
-langchain-groq 
+langchain-openai
 langchain-huggingface 
 langchain-chroma
 langchain-text-splitters
 langchain-classic
 langgraph
 
-groq 
+openai
 
 docling
 
@@ -22,6 +22,9 @@ chromadb
 rank-bm25
 
 pydantic-settings
+
+pytest
+pytest-asyncio
 
 python-dotenv
 loguru

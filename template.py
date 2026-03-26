@@ -23,9 +23,12 @@ list_of_files = [
     "src/retriever/builder.py",
     "src/custom_logger/__init__.py",
     "src/custom_logger/logger.py",
-    "tests/file_handler.py",
+    "tests/__init__.py",
+    "tests/test_file_handler.py",
     "tests/test_builder.py",
     "tests/test_relevance_checker.py",
+    "tests/test_verification_agent.py",
+    "tests/test_research_agent.py",
     "app.py",
     ".env"
 ]

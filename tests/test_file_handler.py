@@ -1,24 +1,18 @@
 import os
+import pytest 
 from src.document_processor.file_handler import DocumentProcessor
-import time
 
-processor = DocumentProcessor()
+# fixtures help prepare data,objects or env before running tests 
+# run pytest tests/test_file_handler.py -v
 
+@pytest.fixture
+def processor():
+    return DocumentProcessor()
 
-file_paths = [(os.path.join("examples", "gpt4o_report.pdf"))]
-
-print(f"File exists: {os.path.exists(file_paths)}")
-
-
-print("--- First run (should process + cache) ---")
-chunks = processor.process(file_paths)
-print(f"Total chunks: {len(chunks)}")
-print(f"\nFirst chunk content:\n{chunks[0].page_content[:300]}")
-print(f"\nFirst chunk metadata:\n{chunks[0].metadata}")
-
-print("\n--- Second run (should load from cache instantly) ---")
-start = time.time()
-chunks2 = processor.process(file_paths)
-elapsed = time.time() - start
-print(f"Total chunks: {len(chunks2)}")
-print(f"Time taken: {elapsed:.2f}s  <- should be near 0 if cache hit")
+@pytest.mark.asyncio
+async def test_pdf_processing(processor):
+    docs = await processor.process([r"examples\gpt4o_report.pdf"])
+    assert docs is not None 
+    assert len(docs) > 0 
+    assert docs[0].page_content != ""
+    assert "source" in docs[0].metadata
