@@ -574,13 +574,14 @@ wheels = [
 [[package]]
 name = "docchat"
 version = "0.1.0"
-source = { virtual = "." }
+source = { editable = "." }
 dependencies = [
     { name = "chromadb" },
     { name = "docling" },
     { name = "groq" },
     { name = "langchain" },
     { name = "langchain-chroma" },
+    { name = "langchain-classic" },
     { name = "langchain-community" },
     { name = "langchain-core" },
     { name = "langchain-groq" },
@@ -604,6 +605,7 @@ requires-dist = [
     { name = "groq", specifier = ">=0.37.1" },
     { name = "langchain", specifier = ">=1.2.13" },
     { name = "langchain-chroma", specifier = ">=1.1.0" },
+    { name = "langchain-classic", specifier = ">=1.0.3" },
     { name = "langchain-community", specifier = ">=0.4.1" },
     { name = "langchain-core", specifier = ">=1.2.22" },
     { name = "langchain-groq", specifier = ">=1.1.2" },

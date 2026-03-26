@@ -10,6 +10,7 @@ dependencies = [
     "groq>=0.37.1",
     "langchain>=1.2.13",
     "langchain-chroma>=1.1.0",
+    "langchain-classic>=1.0.3",
     "langchain-community>=0.4.1",
     "langchain-core>=1.2.22",
     "langchain-groq>=1.1.2",

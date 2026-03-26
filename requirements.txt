@@ -5,6 +5,7 @@ langchain-groq
 langchain-huggingface 
 langchain-chroma
 langchain-text-splitters
+langchain-classic
 langgraph
 
 groq 
