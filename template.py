@@ -24,6 +24,7 @@ list_of_files = [
     "src/custom_logger/__init__.py",
     "src/custom_logger/logger.py",
     "app.py",
+    ".env"
 ]
 
 for file_path in list_of_files:
