@@ -25,6 +25,7 @@ list_of_files = [
     "src/custom_logger/logger.py",
     "tests/file_handler.py",
     "tests/test_builder.py",
+    "tests/test_relevance_checker.py",
     "app.py",
     ".env"
 ]

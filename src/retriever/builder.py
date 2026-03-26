@@ -20,7 +20,7 @@ class RetrieverBuilder:
         logger.info("Embeddings model ready")
 
     
-    def build_hybrid_retrievers(self,docs: List[Document]) -> EnsembleRetriever:
+    def build_hybrid_retriever(self,docs: List[Document]) -> EnsembleRetriever:
         """Build a BM25 + Chroma Ensemble Retriever"""
         try:
             vector_store = Chroma.from_documents(documents=docs,
