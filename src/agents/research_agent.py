@@ -56,12 +56,15 @@ class ResearchAgent:
     MAX_CHARS = 500
     TIMEOUT = 45
 
-    def __init__(self,llm: Optional[ChatOpenAI]):
+    def __init__(self,llm: Optional[ChatOpenAI] = None):
 
-        self.llm = llm or ChatOpenAI(model=settings.RESEARCH_MODEL,
+        if llm is None:
+            self.llm = ChatOpenAI(model=settings.RESEARCH_MODEL,
                                      temperature=0.1,
                                      max_completion_tokens=settings.RESEARCH_MAX_TOKENS,
                                      api_key=settings.OPENAI_API_KEY)
+        
+        self.llm = llm
         
         self.chain = (
             RESEARCH_PROMPT 

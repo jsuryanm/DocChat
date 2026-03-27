@@ -30,10 +30,11 @@ class AgentWorkflow:
         g.add_node("rewrite",self._rewrite)
         g.add_node("retrieve",self._retrieve)
         g.add_node("rerank",self._rerank)
-        g.add_node("research",self._researh)
+        g.add_node("research",self._research)
         g.add_node("grade",self._grade)
         g.add_node("verify",self._verify)
         g.add_node("reflect",self._reflect)
+        g.add_node("finalize",self._finalize)
 
         g.add_edge(START,"rewrite")
         g.add_edge("rewrite","retrieve")
@@ -44,11 +45,12 @@ class AgentWorkflow:
 
         g.add_conditional_edges("verify",
                                 self._route_after_verify,
-                                {"accept":END,
+                                {"accept":"finalize",
                                  "retry":"reflect",
-                                 "stop":END})
+                                 "stop":"finalize"})
         
-        g.add_edge("reflect","research")
+        g.add_edge("reflect","rewrite")
+        g.add_edge("finalize",END)
 
         return g.compile()
     
@@ -94,12 +96,12 @@ class AgentWorkflow:
         result = await self.grade.grade(state["question"],state["draft_answer"])
 
         return {"answer_quality":result["quality"],
-                "reasoning_steps":[f"Answer quality = {result["quality"]}"]}
+                "reasoning_steps":[f"Answer quality = {result['quality']}"]}
     
     def _verify(self,state):
         logger.info("Verifying ground")
 
-        result = self.verify.chunk(state["draft_answer"],
+        result = self.verify.check(state["draft_answer"],
                                    state["reranked_docs"])
         
         grounded = result["supported"] == "YES"
@@ -109,23 +111,35 @@ class AgentWorkflow:
     
     def _reflect(self,state):
         logger.info("Retry triggered")
-
-        return {"retry_count":state["retry_count"] + 1,
-                "reasoning_steps":["Retry triggered by workflow"]}
+        retries = state.get("retry_count",0) + 1
+        return {"retry_count":retries,
+                "reasoning_steps":[f"Retry attempt {retries}"]}
     
     def _route_after_verify(self,state):
+
         logger.info("Routing decision")
 
-        if state["grounded"] and state["answer_quality"] == "HIGH":
+        decision = self.reflect.decide(grounded=state["grounded"],
+                                       quality=state["answer_quality"],
+                                       retries=state["retry_count"],
+                                       max_retries=self.MAX_RETRIES)
+
+        if decision == "accept":
             logger.info("Answer accepted")
+            state["final_answer"] = state["draft_answer"]
             return "accept"
-        
-        if state["retry_count"] >= self.MAX_RETRIES:
+
+        if decision == "stop":
             logger.info("Retry limit reached")
+            state["final_answer"] = state["draft_answer"]
             return "stop"
-        
+
         logger.info("Retrying research")
         return "retry"
+    
+    async def _finalize(self,state):
+        return {"final_answer":state["draft_answer"],
+                "reasoning_steps":["Final answer accepted"]}
     
     async def run(self,question):
 
@@ -145,7 +159,7 @@ class AgentWorkflow:
         
         final = await self.graph.ainvoke(initial)
 
-        return {"final_answer":final["draft_answer"],
+        return {"final_answer":final["final_answer"],
                 "draft_history":final["draft_history"],
                 "reasoning_steps":final["reasoning_steps"],
                 "retries":final["retry_count"]}

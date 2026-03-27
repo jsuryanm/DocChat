@@ -72,7 +72,7 @@ class RetrieverBuilder:
                 logger.info("Creating new CHROMADB")
                 vector_store = await asyncio.to_thread(Chroma.from_documents,
                                                        documents=docs,
-                                                       embedding=embeddings,
+                                                       embedding_function=embeddings,
                                                        persist_directory=settings.CHROMA_DB_PATH,
                                                        collection_name=settings.CHROMA_COLLECTION_NAME)
 

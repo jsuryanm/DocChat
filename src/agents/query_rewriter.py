@@ -2,6 +2,7 @@ from pydantic import BaseModel,Field
 from langchain_openai import ChatOpenAI
 from langchain_core.prompts import ChatPromptTemplate
 from src.config.settings import settings 
+from src.custom_logger.logger import logger 
 
 class RewriteResult(BaseModel):
     rewritten_question: str = Field(description="Improved search query")
@@ -31,5 +32,6 @@ class QueryRewriter:
             result = await self.chain.ainvoke({"question":question})
             return result.rewritten_question
         
-        except: 
+        except Exception as e:
+            logger.warning(f"Rewrite failed: {e}")
             return question

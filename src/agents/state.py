@@ -17,7 +17,7 @@ class AgentState(TypedDict):
     answer_quality: str
     grounded: bool
     retry_count: int
-    failuire_reason: str
+    failure_reason: str
     
     draft_history: Annotated[List[str],operator.add]
     reasoning_steps: Annotated[List[str],operator.add] 

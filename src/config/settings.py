@@ -29,7 +29,6 @@ class Settings(BaseSettings):
     RERANK_BATCH_SIZE: int = 16
 
     RERANKER_TOP_N: int = 3 
-    VECTOR_SEARCH_K: int = 20
 
     CACHE_DIR: str = "document_cache"
     CACHE_EXPIRE_DAYS: int = 7
