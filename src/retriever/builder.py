@@ -1,11 +1,12 @@
 from typing import List
+from pathlib import Path
 import asyncio
 
 from langchain_chroma import Chroma
 from langchain_openai import OpenAIEmbeddings
 from langchain_community.retrievers import BM25Retriever
 from langchain_classic.retrievers import EnsembleRetriever
-from langchain_community.cross_encoders import HuggingFaceCrossEncoder
+from langchain_community.cross_encoders import HuggingFaceCrossEncoder # (reranker)
 from langchain_core.documents import Document
 
 from src.config.settings import settings
@@ -34,15 +35,16 @@ class RetrieverBuilder:
         if self._embeddings is None:
             logger.info("Loading embeddings model")        
             self._embeddings = OpenAIEmbeddings(model=settings.EMBEDDINGS_MODEL,
-                                                api_key=settings.OPENAI_API_KEY)
-            return self._embeddings
+                                                api_key=settings.OPENAI_API_KEY,
+                                                chunk_size=settings.EMBEDDINGS_BATCH_SIZE)
+        return self._embeddings
      
     async def _get_reranker(self):
         if self._reranker is None:
             logger.info("Loading reranker model")
             
             self._reranker = HuggingFaceCrossEncoder(model_name=settings.RERANKER_MODEL)  
-            return self._reranker
+        return self._reranker
 
     
     async def build_hybrid_retriever(self,
@@ -57,19 +59,22 @@ class RetrieverBuilder:
         try:
             embeddings = await self._get_embeddings() 
             
-            if persist:
+            if persist and Path(settings.CHROMA_DB_PATH).exists():
+                logger.info("Loading existing CHROMADB")
+                vector_store = await asyncio.to_thread(Chroma.from_documents,
+                                                       documents=docs,
+                                                       embedding_function=embeddings,
+                                                       persist_directory=settings.CHROMA_DB_PATH,
+                                                       collection_name=settings.CHROMA_COLLECTION_NAME)
+                
+            
+            else:
+                logger.info("Creating new CHROMADB")
                 vector_store = await asyncio.to_thread(Chroma.from_documents,
                                                        documents=docs,
                                                        embedding=embeddings,
                                                        persist_directory=settings.CHROMA_DB_PATH,
                                                        collection_name=settings.CHROMA_COLLECTION_NAME)
-                
-                logger.info("Chroma vector store created")
-            
-            else:
-                vector_store = await asyncio.to_thread(Chroma.from_documents,
-                                                       documents=docs,
-                                                       embedding=embeddings)
 
 
             bm25 = await asyncio.to_thread(BM25Retriever.from_documents,docs)
@@ -98,11 +103,28 @@ class RetrieverBuilder:
             return []
         try:
             reranker = await self._get_reranker()
-            
-            scores = await asyncio.to_thread(reranker.score,
-                                             query,
-                                             [doc.page_content for doc in docs])
-            
+
+            logger.info(f"BM25 docs: {len(docs)}")
+            logger.info(f"Vector search k:{settings.VECTOR_SEARCH_K}")
+
+            batch_size = settings.RERANK_BATCH_SIZE
+
+            doc_texts = [d.page_content for d in docs]
+
+            batches = [
+                doc_texts[i:i+batch_size]
+                for i in range(0,len(doc_texts),batch_size)
+            ]
+
+            tasks = [
+                asyncio.to_thread(reranker.score,query,batch)
+                for batch in batches
+            ]
+
+            results = await asyncio.gather(*tasks)
+
+            scores = [s for batch in results for s in batch]
+                        
             if len(scores) != len(docs):
                 logger.warning("Rerank score mismatch")
             

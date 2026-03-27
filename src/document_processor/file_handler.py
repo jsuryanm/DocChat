@@ -21,13 +21,13 @@ from src.custom_logger.logger import logger
 class DocumentProcessor:
 
     def __init__(self):
-
         self.cache_dir = Path(settings.CACHE_DIR)
         self.cache_dir.mkdir(parents=True,exist_ok=True)
 
 
 
     def validate_files(self,files: List[str]) -> None:
+        # Checks if file is too large or path doesn't exist
         total_size = sum(os.path.getsize(f) for f in files)
 
         if total_size > MAX_TOTAL_SIZE:
@@ -48,7 +48,10 @@ class DocumentProcessor:
         tasks = [self._process_single_file(path)
                 for path in file_paths]
 
-        results = await asyncio.gather(*tasks,return_exceptions=True)
+        results = await asyncio.gather(*tasks,
+                                       return_exceptions=True)
+        # asyncio.gather 
+        # runs multiple async functions parallely and collects result 
 
         all_chunks = []
         seen_hashes = set()
@@ -73,8 +76,9 @@ class DocumentProcessor:
 
 
     async def _process_single_file(self,path:str):
-
+        # Used for caching file
         try:
+            # asyncio.to_thread run blocking (normal) functions inside the async code
             file_hash = await asyncio.to_thread(self._hash_file,path)
             
             cache_path = self.cache_dir /f"{file_hash}.pkl"
@@ -101,7 +105,7 @@ class DocumentProcessor:
 
 
     def _process_file(self,path: str) -> List[Document]:
-
+        # Converts a file to markdown and then to chunks 
         ext = Path(path).suffix.lower()
 
         if ext not in settings.ALLOWED_TYPES:
@@ -110,26 +114,11 @@ class DocumentProcessor:
         try:
 
             if ext == ".pdf":
-
                 pipeline = PdfPipelineOptions()
                 pipeline.do_ocr = False
-
-                converter = DocumentConverter(
-
-                    format_options={
-
-                        "pdf": PdfFormatOption(
-
-                            pipeline_options=pipeline
-
-                        )
-
-                    }
-
-                )
+                converter = DocumentConverter(format_options={"pdf": PdfFormatOption(pipeline_options=pipeline)})
 
             else:
-
                 converter = DocumentConverter()
 
             markdown = (
