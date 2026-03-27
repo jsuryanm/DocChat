@@ -3,6 +3,9 @@ from src.config.constants import MAX_FILE_SIZE,MAX_TOTAL_SIZE,ALLOWED_TYPES
 
 class Settings(BaseSettings):
     OPENAI_API_KEY: str 
+    TAVILY_API_KEY: str
+
+    MCP_ENABLED_SERVERS: str = "*"
 
     MAX_FILE_SIZE: int = MAX_FILE_SIZE
     MAX_TOTAL_SIZE: int = MAX_TOTAL_SIZE
