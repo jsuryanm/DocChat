@@ -44,6 +44,7 @@ list_of_files = [
     "tests/test_reflexion_agent.py",
     "tests/test_workflow.py",
     "tests/test_mcp_tools.py",
+    "tests/test_mcp_client.py",
     "tests/test_a2a_server.py",
     "tests/test_a2a_client.py",
     "app.py",
