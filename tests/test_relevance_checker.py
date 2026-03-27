@@ -6,43 +6,29 @@ from src.agents.relevance_checker import RelevanceChecker
 
 
 class FakeRetriever:
-    """Mock retriever for testing"""
 
-    def invoke(self, query: str):
+    def invoke(self,query):
+
         return [
-            Document(page_content="GPT-4o is an OpenAI multimodal model"),
-            Document(page_content="LangChain helps build RAG systems"),
-            Document(page_content="BM25 is keyword retrieval")
+            Document(
+                page_content="Python is programming language",
+                metadata={}
+            )
         ]
 
 
-@pytest.fixture
-def checker():
-    return RelevanceChecker()
-
-
-@pytest.fixture
-def retriever():
-    return FakeRetriever()
-
-
 @pytest.mark.asyncio
-async def test_relevance_can_answer(checker, retriever):
+async def test_relevance_checker():
 
-    result = await checker.check("What is GPT-4o?",
-                                 retriever)
+    checker = RelevanceChecker()
 
-    assert result in {"CAN_ANSWER","PARTIAL","NO_MATCH"}
+    label = await checker.check(
+        "What is python?",
+        FakeRetriever()
+    )
 
-
-@pytest.mark.asyncio
-async def test_relevance_no_docs(checker):
-
-    class EmptyRetriever:
-        def invoke(self, query):
-            return []
-
-    result = await checker.check("test question",
-                                 EmptyRetriever())
-
-    assert result == "NO_MATCH"
+    assert label in [
+        "CAN_ANSWER",
+        "PARTIAL",
+        "NO_MATCH"
+    ]

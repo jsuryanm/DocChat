@@ -98,10 +98,10 @@ class AgentWorkflow:
         return {"answer_quality":result["quality"],
                 "reasoning_steps":[f"Answer quality = {result['quality']}"]}
     
-    def _verify(self,state):
+    async def _verify(self,state):
         logger.info("Verifying ground")
 
-        result = self.verify.check(state["draft_answer"],
+        result = await self.verify.check(state["draft_answer"],
                                    state["reranked_docs"])
         
         grounded = result["supported"] == "YES"
@@ -121,7 +121,7 @@ class AgentWorkflow:
 
         decision = self.reflect.decide(grounded=state["grounded"],
                                        quality=state["answer_quality"],
-                                       retries=state["retry_count"],
+                                       retries=state.get("retry_count",0),
                                        max_retries=self.MAX_RETRIES)
 
         if decision == "accept":
@@ -153,7 +153,7 @@ class AgentWorkflow:
                    "answer_quality":"",
                    "grounded":False,
                    "retry_count":0,
-                   "failuire_reason":"",
+                   "failure_reason":"",
                    "draft_history":[],
                    "reasoning_steps":[]}
         

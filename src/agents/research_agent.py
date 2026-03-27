@@ -58,14 +58,12 @@ class ResearchAgent:
 
     def __init__(self,llm: Optional[ChatOpenAI] = None):
 
-        if llm is None:
-            self.llm = ChatOpenAI(model=settings.RESEARCH_MODEL,
-                                     temperature=0.1,
-                                     max_completion_tokens=settings.RESEARCH_MAX_TOKENS,
-                                     api_key=settings.OPENAI_API_KEY)
         
-        self.llm = llm
-        
+        self.llm = ChatOpenAI(model=settings.RESEARCH_MODEL,
+                                    temperature=0.1,
+                                    max_completion_tokens=settings.RESEARCH_MAX_TOKENS,
+                                    api_key=settings.OPENAI_API_KEY)
+                
         self.chain = (
             RESEARCH_PROMPT 
             | self.llm.with_structured_output(ResearchResult)    

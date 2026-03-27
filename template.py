@@ -33,6 +33,10 @@ list_of_files = [
     "tests/test_relevance_checker.py",
     "tests/test_verification_agent.py",
     "tests/test_research_agent.py",
+    "tests/test_query_rewriter.py",
+    "tests/test_answer_grader.py",
+    "tests/test_reflexion_agent.py",
+    "tests/test_workflow.py",
     "app.py",
     ".env"
 ]
