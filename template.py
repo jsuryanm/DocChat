@@ -18,6 +18,12 @@ list_of_files = [
     "src/agents/workflow.py",
     "src/agents/research_agent.py",
     "src/agents/verfication_agent.py",
+    "src/tools/__init__.py",
+    "src/tools/mcp_tools.py",
+    "src/tools/mcp_client.py",
+    "src/a2a/__init__.py",
+    "src/a2a/server.py",
+    "src/a2a/client.py",
     "src/config/__init__.py",
     "src/config/constants.py",
     "src/config/settings.py",
@@ -37,6 +43,9 @@ list_of_files = [
     "tests/test_answer_grader.py",
     "tests/test_reflexion_agent.py",
     "tests/test_workflow.py",
+    "tests/test_mcp_tools.py",
+    "tests/test_a2a_server.py",
+    "tests/test_a2a_client.py",
     "app.py",
     ".env"
 ]

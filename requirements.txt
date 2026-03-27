@@ -6,7 +6,14 @@ langchain-huggingface
 langchain-chroma
 langchain-text-splitters
 langchain-classic
+langchain-mcp-adapters
+langchain-tavily
 langgraph
+
+tavily-python
+
+mcp[cli]
+a2a-sdk
 
 openai
 
