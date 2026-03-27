@@ -83,4 +83,70 @@ class AgentWorkflow:
         result = await self.research.generate(state["rewritten_question"],
                                               state["reranked_docs"])
         
-        return {"draft_answer":result['draft_answer']}
+        return {"draft_answer":result['draft_answer'],
+                "confidence":result["confidence"],
+                "draft_history":[result["draft_answer"]],
+                "reasoning_steps":["Research agent generated an answer"]}
+    
+    async def _grade(self,state):
+        logger.info("Grading the answer")
+
+        result = await self.grade.grade(state["question"],state["draft_answer"])
+
+        return {"answer_quality":result["quality"],
+                "reasoning_steps":[f"Answer quality = {result["quality"]}"]}
+    
+    def _verify(self,state):
+        logger.info("Verifying ground")
+
+        result = self.verify.chunk(state["draft_answer"],
+                                   state["reranked_docs"])
+        
+        grounded = result["supported"] == "YES"
+
+        return {"grounded":grounded,
+                "reasoning_steps":[f"Verification grounded = {grounded}"]}
+    
+    def _reflect(self,state):
+        logger.info("Retry triggered")
+
+        return {"retry_count":state["retry_count"] + 1,
+                "reasoning_steps":["Retry triggered by workflow"]}
+    
+    def _route_after_verify(self,state):
+        logger.info("Routing decision")
+
+        if state["grounded"] and state["answer_quality"] == "HIGH":
+            logger.info("Answer accepted")
+            return "accept"
+        
+        if state["retry_count"] >= self.MAX_RETRIES:
+            logger.info("Retry limit reached")
+            return "stop"
+        
+        logger.info("Retrying research")
+        return "retry"
+    
+    async def run(self,question):
+
+        initial = {"question":question,
+                   "rewritten_question":"",
+                   "documents":[],
+                   "reranked_docs":[],
+                   "draft_answer":"",
+                   "final_answer":"",
+                   "confidence":"",
+                   "answer_quality":"",
+                   "grounded":False,
+                   "retry_count":0,
+                   "failuire_reason":"",
+                   "draft_history":[],
+                   "reasoning_steps":[]}
+        
+        final = await self.graph.ainvoke(initial)
+
+        return {"final_answer":final["draft_answer"],
+                "draft_history":final["draft_history"],
+                "reasoning_steps":final["reasoning_steps"],
+                "retries":final["retry_count"]}
+        
