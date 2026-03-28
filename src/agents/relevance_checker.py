@@ -1,7 +1,8 @@
-import asyncio
-from typing import Union
+from typing import List
 
+from pydantic import BaseModel, Field
 from langchain_openai import ChatOpenAI
+from langchain_core.documents import Document
 from langchain_core.prompts import ChatPromptTemplate
 
 from src.config.settings import settings
@@ -10,94 +11,96 @@ from src.custom_logger.logger import logger
 _VALID_LABELS = {"CAN_ANSWER", "PARTIAL", "NO_MATCH"}
 
 
+class RelevanceResult(BaseModel):
+    label: str = Field(description="Exactly one of: CAN_ANSWER, PARTIAL, NO_MATCH")
+
+
 class RelevanceChecker:
 
     PROMPT_TEMPLATE = ChatPromptTemplate.from_messages([
         (
             "system",
             "You are a strict relevance classifier.\n"
-            "Return ONLY one of these exact words — nothing else:\n"
-            "CAN_ANSWER  PARTIAL  NO_MATCH\n"
-            "Do not add punctuation, explanation, or any other text."
+            "Given a question and some document passages, decide whether the passages "
+            "contain enough information to answer the question.\n\n"
+            "Rules:\n"
+            "- CAN_ANSWER: passages directly address the question\n"
+            "- PARTIAL: passages are related but incomplete\n"
+            "- NO_MATCH: passages are unrelated or empty\n\n"
+            "Return ONLY the label field. Do not explain."
         ),
         (
             "human",
-            "Question: {question}\n\nPassages:\n{passages}\n\nLabel:"
+            "Question: {question}\n\nPassages:\n{passages}"
         )
     ])
 
     def __init__(self):
-        self.llm = ChatOpenAI(
+        llm = ChatOpenAI(
             model=settings.RELEVANCY_MODEL,
-            temperature=1,
-            max_tokens=200,
-            model_kwargs={"reasoning_effort": "low"},
+            temperature=0,
+            max_tokens=settings.RELEVANCE_MAX_TOKENS,
             api_key=settings.OPENAI_API_KEY,
+            reasoning_effort="low"
         )
+
+        # Use structured output — same pattern as QueryRewriter, AnswerGrader,
+        # VerificationAgent. This works correctly with reasoning models because
+        # the SDK extracts the answer from the right field automatically,
+        # instead of relying on raw_response.content which is empty for
+        # reasoning model variants like gpt-5-nano.
+        self.chain = self.PROMPT_TEMPLATE | llm.with_structured_output(RelevanceResult)
 
     async def check(
         self,
         question: str,
-        retriever,           # accepts EnsembleRetriever or EmptyRetriever
+        documents: List[Document],
         k: int = 3,
     ) -> str:
-        """Retrieve top-k chunks and classify relevance.
+        """Classify relevance of already-retrieved documents against the question.
 
         Parameters
         ----------
         question : str
             The (rewritten) user question.
-        retriever : EnsembleRetriever | EmptyRetriever
-            The retriever built for this session.  Passed explicitly so
-            the checker remains stateless and reusable across sessions.
+        documents : List[Document]
+            The reranked documents produced by the rerank node. Passing
+            them directly avoids a second retrieval call that can return
+            an inconsistent doc set.
         k : int
-            Number of passages to inspect.
+            How many of the top documents to inspect.
 
         Returns
         -------
         str
             One of: CAN_ANSWER | PARTIAL | NO_MATCH
         """
-        try:
-            top_docs = await asyncio.to_thread(retriever.invoke, question)
-        except Exception as e:
-            logger.error(f"Retriever failed in relevance check: {e}")
-            return "NO_MATCH"
-
-        if not top_docs:
-            logger.warning("No documents retrieved — defaulting to NO_MATCH")
+        if not documents:
+            logger.warning("No documents passed to relevance check — defaulting to NO_MATCH")
             return "NO_MATCH"
 
         passages = "\n\n".join(
-            doc.page_content[:500] for doc in top_docs[:k]
+            doc.page_content[:500] for doc in documents[:k]
         )
 
         try:
-            messages = self.PROMPT_TEMPLATE.format_messages(
-                question=question,
-                passages=passages,
-            )
-            raw_response = await self.llm.ainvoke(messages)
-            text = raw_response.content
-
-            if isinstance(text, list):
-                text = " ".join(
-                    block.get("text", "") if isinstance(block, dict) else str(block)
-                    for block in text
-                )
-
-            logger.debug(f"RelevanceChecker raw output: {repr(text)}")
+            result: RelevanceResult = await self.chain.ainvoke({
+                "question": question,
+                "passages": passages,
+            })
+            label = result.label.strip().upper()
+            logger.debug(f"RelevanceChecker structured output: {repr(label)}")
 
         except Exception as e:
             logger.warning(f"RelevanceChecker LLM call failed: {e}")
             return "NO_MATCH"
 
-        return self._parse_label(text)
+        return self._parse_label(label)
 
     @staticmethod
     def _parse_label(raw: str) -> str:
         if not raw:
-            logger.warning("RelevanceChecker: model returned empty content")
+            logger.warning("RelevanceChecker: model returned empty label")
             return "NO_MATCH"
 
         for token in raw.upper().split():
@@ -106,6 +109,6 @@ class RelevanceChecker:
                 return cleaned
 
         logger.warning(
-            f"RelevanceChecker: unrecognised output '{raw}' — defaulting to NO_MATCH"
+            f"RelevanceChecker: unrecognised label '{raw}' — defaulting to NO_MATCH"
         )
         return "NO_MATCH"

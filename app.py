@@ -47,7 +47,7 @@ if st.button("Run") and uploaded and question:
             reachable = await ping_remote_agent(settings.REMOTE_AGENT_URL)
             if not reachable:
                 st.warning(
-                    f"⚠️ Remote agent at `{settings.REMOTE_AGENT_URL}` is not reachable. "
+                    f"Remote agent at `{settings.REMOTE_AGENT_URL}` is not reachable. "
                     "Questions that require delegation will fall back to an error message."
                 )
 
@@ -75,7 +75,7 @@ if st.button("Run") and uploaded and question:
     st.write(result["final_answer"])
 
     if result.get("delegated"):
-        st.info("ℹ️ This answer was sourced from a remote specialist agent.")
+        st.info("ℹ This answer was sourced from a remote specialist agent.")
 
     with st.expander("Reasoning steps"):
         for step in result["reasoning_steps"]:

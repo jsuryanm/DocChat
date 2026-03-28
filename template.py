@@ -48,7 +48,12 @@ list_of_files = [
     "tests/test_a2a_server.py",
     "tests/test_a2a_client.py",
     "app.py",
-    ".env"
+    ".env",
+    "CLAUDE.md",
+    "docs/skills.md",
+    "docs/state.md",
+    "docs/workflow.md",
+    "docs/architecture.md",
 ]
 
 for file_path in list_of_files:

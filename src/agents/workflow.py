@@ -123,7 +123,9 @@ class AgentWorkflow:
     async def _check_relevance(self, state):
         logger.info("Checking relevance")
         label = await self.relevance.check(
-            question=state["rewritten_question"], retriever=self.retriever
+            question=state["rewritten_question"],
+            documents=state["reranked_docs"],   # FIX: use already-reranked docs,
+                                                #      not a fresh retriever.invoke()
         )
         logger.info(f"Relevance label: {label}")
         return {
