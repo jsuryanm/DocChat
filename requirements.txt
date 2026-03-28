@@ -29,13 +29,18 @@ chromadb
 rank-bm25
 
 pydantic-settings
+fastapi 
+uvicorn[standard]
 
 pytest
 pytest-asyncio
-
 python-dotenv
+python-multipart 
+
 loguru
+
 httpx
+
 nest_asyncio
 
 streamlit
