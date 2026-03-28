@@ -24,9 +24,9 @@ class Settings(BaseSettings):
     EMBEDDINGS_MODEL: str = "text-embedding-3-small"
     EMBEDDINGS_BATCH_SIZE: int = 100
 
-    RESEARCH_MAX_TOKENS: int = 800
-    VERIFY_MAX_TOKENS: int = 1200
-    RELEVANCE_MAX_TOKENS: int = 30
+    RESEARCH_MAX_TOKENS: int = 1600
+    VERIFY_MAX_TOKENS: int = 400
+    RELEVANCE_MAX_TOKENS: int = 200
 
     RERANKER_MODEL: str = "cross-encoder/ms-marco-MiniLM-L-6-v2"
     RERANK_BATCH_SIZE: int = 16

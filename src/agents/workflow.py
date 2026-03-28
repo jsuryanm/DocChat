@@ -181,10 +181,14 @@ class AgentWorkflow:
                     "delegated":True,
                     "reasoning_steps":["A2A delegation failed"]}
         
-    def _route_after_relevance(self,state):
-        if state["relevance_label"] == "NO_MATCH":
+    
+    def _route_after_relevance(self, state):
+        label = state["relevance_label"]
+        if label == "NO_MATCH":
+            logger.info("No relevant docs found — short-circuiting to finalize")
             return "finalize"
         return "research"
+
             
     def _route_after_rerank(self,state):
         """Delegate via A2A if no documents were retrieved"""
@@ -222,9 +226,30 @@ class AgentWorkflow:
         
         return "stop"
     
-    async def _finalize(self,state):
-        return {"final_answer":state["draft_answer"],
-                "reasoning_steps":["Final answer accepted"]}
+    async def _finalize(self, state):
+        draft = state.get("draft_answer", "").strip()
+
+        # Guard: if nothing produced a draft (NO_MATCH short-circuit, A2A failure, etc.)
+        if not draft:
+            label = state.get("relevance_label", "")
+            if label == "NO_MATCH":
+                draft = (
+                    "I couldn't find relevant information in the uploaded documents "
+                    "to answer your question. Please try rephrasing or upload "
+                    "additional documents that cover this topic."
+                )
+            else:
+                draft = "The agent was unable to produce an answer. Please try again."
+
+            logger.warning(
+                f"_finalize: empty draft_answer with relevance_label='{label}' "
+                "— using fallback message"
+            )
+
+        return {
+            "final_answer": draft,
+            "reasoning_steps": ["Final answer accepted"],
+        }
     
     async def run(self,question):
 
