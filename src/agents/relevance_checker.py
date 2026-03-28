@@ -5,6 +5,15 @@ from langchain_openai import ChatOpenAI
 from langchain_core.documents import Document
 from langchain_core.prompts import ChatPromptTemplate
 
+# FIX: import the specific OpenAI exception so we can tell a token-limit
+# crash apart from a genuine retrieval failure.
+try:
+    from openai import LengthFinishReasonError
+except ImportError:
+    # Fallback for openai SDK versions that don't expose this symbol at the
+    # top level — define a sentinel that will never match.
+    LengthFinishReasonError = None  # type: ignore[assignment,misc]
+
 from src.config.settings import settings
 from src.custom_logger.logger import logger
 
@@ -44,11 +53,6 @@ class RelevanceChecker:
             reasoning_effort="low"
         )
 
-        # Use structured output — same pattern as QueryRewriter, AnswerGrader,
-        # VerificationAgent. This works correctly with reasoning models because
-        # the SDK extracts the answer from the right field automatically,
-        # instead of relying on raw_response.content which is empty for
-        # reasoning model variants like gpt-5-nano.
         self.chain = self.PROMPT_TEMPLATE | llm.with_structured_output(RelevanceResult)
 
     async def check(
@@ -64,9 +68,7 @@ class RelevanceChecker:
         question : str
             The (rewritten) user question.
         documents : List[Document]
-            The reranked documents produced by the rerank node. Passing
-            them directly avoids a second retrieval call that can return
-            an inconsistent doc set.
+            The reranked documents produced by the rerank node.
         k : int
             How many of the top documents to inspect.
 
@@ -91,7 +93,22 @@ class RelevanceChecker:
             label = result.label.strip().upper()
             logger.debug(f"RelevanceChecker structured output: {repr(label)}")
 
+        # FIX: LengthFinishReasonError means the model ran out of tokens before
+        # it could emit the structured label — this is a tool/config failure,
+        # NOT evidence that the documents are irrelevant.  Returning NO_MATCH
+        # here caused the retry-pass to short-circuit to finalize and discard
+        # a valid first-round answer.  Return PARTIAL instead: the pipeline
+        # will still proceed to research, and the answer quality + grounding
+        # checks downstream will decide whether to accept or retry.
         except Exception as e:
+            if LengthFinishReasonError is not None and isinstance(e, LengthFinishReasonError):
+                logger.warning(
+                    "RelevanceChecker: token limit reached before structured output "
+                    "was produced — defaulting to PARTIAL to preserve pipeline progress. "
+                    "Consider raising RELEVANCE_MAX_TOKENS in settings."
+                )
+                return "PARTIAL"
+
             logger.warning(f"RelevanceChecker LLM call failed: {e}")
             return "NO_MATCH"
 

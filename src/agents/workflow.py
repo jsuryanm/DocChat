@@ -34,6 +34,10 @@ class AgentWorkflow:
 
         self.graph = self._build()
 
+    # ------------------------------------------------------------------
+    # Graph construction
+    # ------------------------------------------------------------------
+
     def _build(self):
         g = StateGraph(AgentState)
 
@@ -86,12 +90,7 @@ class AgentWorkflow:
         )
 
         g.add_edge("reflect", "rewrite")
-
-        # Fix 2: delegate now feeds into grade → verify so remote answers
-        # are grounded-checked before being finalised.  Previously this
-        # edge went straight to finalize, bypassing all quality checks.
         g.add_edge("delegate", "grade")
-
         g.add_edge("finalize", END)
 
         return g.compile()
@@ -124,8 +123,7 @@ class AgentWorkflow:
         logger.info("Checking relevance")
         label = await self.relevance.check(
             question=state["rewritten_question"],
-            documents=state["reranked_docs"],   # FIX: use already-reranked docs,
-                                                #      not a fresh retriever.invoke()
+            documents=state["reranked_docs"],
         )
         logger.info(f"Relevance label: {label}")
         return {
@@ -161,9 +159,29 @@ class AgentWorkflow:
         result = await self.verify.check(
             state["draft_answer"], state["reranked_docs"]
         )
-        grounded = result["supported"] == "YES"
+
+        # FIX: distinguish a tool/LLM failure from a genuine "not grounded"
+        # result.  VerificationAgent.check() returns supported="UNKNOWN" when
+        # the underlying LLM call fails (e.g. LengthFinishReasonError, timeout,
+        # network error).  In that case we set verification_failed=True so
+        # _route_after_verify can short-circuit to "accept" without triggering
+        # a content-quality retry loop that would discard a valid answer.
+        supported = result.get("supported", "UNKNOWN")
+        if supported == "UNKNOWN":
+            logger.warning(
+                "Verify node: supported=UNKNOWN — treating as tool failure, "
+                "not a grounding failure"
+            )
+            return {
+                "grounded": False,
+                "verification_failed": True,
+                "reasoning_steps": ["Verification tool failed — accepted without retry"],
+            }
+
+        grounded = supported == "YES"
         return {
             "grounded": grounded,
+            "verification_failed": False,
             "reasoning_steps": [f"Verification grounded = {grounded}"],
         }
 
@@ -172,6 +190,9 @@ class AgentWorkflow:
         retries = state.get("retry_count", 0) + 1
         return {
             "retry_count": retries,
+            # FIX: reset verification_failed so a fresh verify attempt on the
+            # next pass starts clean and isn't incorrectly short-circuited.
+            "verification_failed": False,
             "reasoning_steps": [f"Retry attempt {retries}"],
         }
 
@@ -248,13 +269,20 @@ class AgentWorkflow:
     def _route_after_verify(self, state):
         logger.info("Routing decision after verify")
 
-        if state.get("relevance_label") == "NO_MATCH":
-            logger.info("No relevant docs -> stopping")
-            return "stop"
+        # FIX: check verification_failed FIRST, before any other branch.
+        # A tool/LLM crash inside the verify node sets this flag.  Allowing
+        # such a crash to fall through to reflect.decide() (which sees
+        # grounded=False) would trigger a content-quality retry on what is
+        # purely an infrastructure failure — potentially discarding a valid
+        # first-round answer, as observed in the production logs.
+        if state.get("verification_failed"):
+            logger.warning(
+                "Verification tool failed — accepting current answer without retry"
+            )
+            return "accept"
 
-        # Fix 2: delegated answers must never trigger a retry.
-        # There are no local documents to retrieve against and re-running
-        # the rewrite → retrieve → delegate loop would be an infinite cycle.
+        # Delegated answers must never trigger a retry: there are no local
+        # documents to retrieve against and re-running the loop would cycle.
         if state.get("delegated"):
             grounded = state.get("grounded", False)
             quality = state.get("answer_quality", "")
@@ -262,6 +290,14 @@ class AgentWorkflow:
                 f"Delegated answer — skipping retry | grounded={grounded} quality={quality}"
             )
             return "accept"
+
+        # FIX: moved NO_MATCH check AFTER verification_failed and delegated.
+        # Previously this was the first branch, which meant a NO_MATCH set
+        # on a previous pass could incorrectly short-circuit a retry that had
+        # since produced a valid CAN_ANSWER result.
+        if state.get("relevance_label") == "NO_MATCH":
+            logger.info("No relevant docs -> stopping")
+            return "stop"
 
         decision = self.reflect.decide(
             grounded=state["grounded"],
@@ -294,11 +330,16 @@ class AgentWorkflow:
             "confidence": "",
             "answer_quality": "",
             "grounded": False,
+            # FIX: initialise verification_failed so the field is always
+            # present in state from the first node onwards.
+            "verification_failed": False,
             "retry_count": 0,
             "failure_reason": "",
             "draft_history": [],
             "reasoning_steps": [],
             "tool_calls": [],
+            # FIX: key matches AgentState field name (was mcp_tool_results in
+            # run() but mcp_tool_call_results in the TypedDict — now aligned).
             "mcp_tool_results": [],
             "delegated": False,
             "relevance_label": "",
