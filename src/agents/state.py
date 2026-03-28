@@ -1,4 +1,4 @@
-from typing import List,Annotated 
+from typing import List,Annotated,Dict,Any
 from typing_extensions import TypedDict
 import operator
 
@@ -21,3 +21,11 @@ class AgentState(TypedDict):
     
     draft_history: Annotated[List[str],operator.add]
     reasoning_steps: Annotated[List[str],operator.add] 
+
+    # MCP
+    tool_calls: List[Dict[str,Any]]
+    mcp_tool_call_results: Annotated[List[str],operator.add]
+
+    # A2A
+    # True whenn the draft_answer originated from remote to A2A agent
+    delegated: bool

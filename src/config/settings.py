@@ -36,6 +36,10 @@ class Settings(BaseSettings):
     CACHE_DIR: str = "document_cache"
     CACHE_EXPIRE_DAYS: int = 7
 
+    REMOTE_AGENT_URL: str = ""
+    A2A_HOST: str = "0.0.0.0"
+    A2A_PORT: int = 9000
+
     LOG_LEVEL: str = "INFO"
 
     model_config = SettingsConfigDict(env_file=".env",
