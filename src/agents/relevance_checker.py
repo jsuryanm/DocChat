@@ -1,8 +1,8 @@
 import asyncio
+from typing import Union
 
 from langchain_openai import ChatOpenAI
 from langchain_core.prompts import ChatPromptTemplate
-from langchain_classic.retrievers import EnsembleRetriever
 
 from src.config.settings import settings
 from src.custom_logger.logger import logger
@@ -29,23 +29,35 @@ class RelevanceChecker:
     def __init__(self):
         self.llm = ChatOpenAI(
             model=settings.RELEVANCY_MODEL,
-            temperature=1,              # reasoning models require temperature=1
-            max_tokens=200,             # enough for reasoning budget + output token
-            model_kwargs={
-                "reasoning_effort": "low"   # minimal reasoning for simple classification
-            },
+            temperature=1,
+            max_tokens=200,
+            model_kwargs={"reasoning_effort": "low"},
             api_key=settings.OPENAI_API_KEY,
         )
 
     async def check(
         self,
         question: str,
-        retriever: EnsembleRetriever,
+        retriever,           # accepts EnsembleRetriever or EmptyRetriever
         k: int = 3,
     ) -> str:
         """Retrieve top-k chunks and classify relevance.
-        Returns: CAN_ANSWER | PARTIAL | NO_MATCH"""
 
+        Parameters
+        ----------
+        question : str
+            The (rewritten) user question.
+        retriever : EnsembleRetriever | EmptyRetriever
+            The retriever built for this session.  Passed explicitly so
+            the checker remains stateless and reusable across sessions.
+        k : int
+            Number of passages to inspect.
+
+        Returns
+        -------
+        str
+            One of: CAN_ANSWER | PARTIAL | NO_MATCH
+        """
         try:
             top_docs = await asyncio.to_thread(retriever.invoke, question)
         except Exception as e:
@@ -66,7 +78,6 @@ class RelevanceChecker:
                 passages=passages,
             )
             raw_response = await self.llm.ainvoke(messages)
-
             text = raw_response.content
 
             if isinstance(text, list):
@@ -75,7 +86,7 @@ class RelevanceChecker:
                     for block in text
                 )
 
-            logger.debug(f"RelevanceChecker content: {repr(text)}")
+            logger.debug(f"RelevanceChecker raw output: {repr(text)}")
 
         except Exception as e:
             logger.warning(f"RelevanceChecker LLM call failed: {e}")
@@ -95,6 +106,6 @@ class RelevanceChecker:
                 return cleaned
 
         logger.warning(
-            f"RelevanceChecker: unrecognized output '{raw}' — defaulting to NO_MATCH"
+            f"RelevanceChecker: unrecognised output '{raw}' — defaulting to NO_MATCH"
         )
         return "NO_MATCH"
