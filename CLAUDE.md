@@ -1,296 +1,146 @@
-# Project Overview
+# CLAUDE.md
 
-This project implements an Agentic RAG system using LangGraph orchestration.
+## Project Purpose
 
-The system uses multiple specialized agents to:
-- Retrieve information
-- Generate answers
-- Verify correctness
-- Improve responses
-- Produce final answers
+This project implements an Agentic RAG system using LangGraph.
 
-Priority order:
-Correctness > Grounding > Reliability > Speed
+Focus areas:
 
----
+Reliability
+Grounded answers
+Verification
+Retry logic
+Agent orchestration
 
-# Architecture
-
-Workflow graph:
-
-retrieve → research → draft → verify → reflexion → finalize
-
-Agents must NOT bypass verification.
-
-ReflexionAgent should only run when verification fails or confidence is low.
+This is NOT a simple RAG.
+This is a production agent pipeline.
 
 ---
 
-# Main Components
+# Key Concepts
+
+## Agent Workflow
+
+Main orchestrator:
+
+AgentWorkflow
+
+Controls all routing.
+
+## State
+
+Typed state defined in:
+
+agents/state.py
+
+State is passed between nodes.
 
 ## Agents
 
-### ResearchAgent
-Responsibilities:
-- Retrieve documents
-- Perform hybrid retrieval (BM25 + vector)
-- Use reranker if available
+QueryRewriter
+ResearchAgent
+VerificationAgent
+AnswerGrader
+RelevanceChecker
+ReflexionAgent
 
-Output:
-draft_answer
-documents
-
-### VerifierAgent
-Responsibilities:
-- Check hallucinations
-- Verify grounding
-- Check source support
-
-Output:
-verification_status
-confidence_score
-missing_facts
-
-### ReflexionAgent
-Responsibilities:
-- Improve weak answers
-- Fix hallucinations
-- Add missing context
-- Rewrite unclear answers
-
-Must NOT retrieve new documents.
-
-Only improve existing answer.
-
-### FinalAnswerAgent
-Responsibilities:
-- Produce clean final response
-- Ensure formatting
-- Remove internal reasoning text
+Each has single responsibility.
 
 ---
 
-# State Management Rules
+# Important Design Rules
 
-State must always contain:
+Agents must:
 
-question: str
-documents: List[Document]
-draft_answer: str
-verification_status: str
-final_answer: str
-
-Rules:
-
-Never delete fields from state.
-
-Agents may only modify their owned fields.
-
-ResearchAgent:
-may update documents and draft_answer.
-
-VerifierAgent:
-may update verification_status and confidence_score.
-
-ReflexionAgent:
-may update draft_answer only.
-
-FinalAnswerAgent:
-sets final_answer.
+Return structured output
+Be async
+Avoid hallucination
+Use settings config
 
 ---
 
-# LangGraph Rules
+# Workflow Graph
 
-Do not change graph structure unless necessary.
+Defined in:
 
-Conditional edges must remain:
+workflow.py
 
-verify → reflexion (if failed)
-verify → finalize (if passed)
+Uses:
 
-Do not introduce cycles unless explicitly required.
-
-Avoid duplicate routing logic.
-
-Use reducer pattern for state updates if needed.
+StateGraph
+Conditional edges
+Retry routing
 
 ---
 
-# MCP Integration Rules
+# Tool System
 
-MCP tools must be:
-- Fail safe
-- Timeout protected
-- Logged
+MCP tools optional.
 
-Never assume MCP server availability.
+Loaded at startup.
 
-Always handle tool failures gracefully.
+Injected into ResearchAgent.
 
 ---
 
-# A2A Rules
+# Delegation
 
-Remote agents must:
-- Be called asynchronously
-- Have retry logic
-- Handle timeout
+Remote agents called via A2A.
 
-Never block workflow waiting indefinitely.
+File:
 
----
-
-# Coding Standards
-
-Python version:
-3.11+
-
-Required:
-Type hints
-Pydantic models
-Structured logging
-
-Avoid:
-Global mutable state
-Blocking calls inside async functions
-Silent exception handling
-
-Always log errors.
+a2a/client.py
 
 ---
 
-# Error Handling Rules
+# Coding Rules
 
-Always:
+Never use deprecated LangChain patterns.
 
-Catch exceptions.
-Log failures.
-Return safe fallback.
+Always prefer:
 
-Never:
-
-Crash workflow.
-Return None unexpectedly.
-Swallow exceptions silently.
+Runnable
+Structured outputs
+Async execution
 
 ---
 
-# Testing Rules
+# Extension Points
 
-When modifying code:
+Add new agent:
 
-Do not break:
-retriever builder
-agent interfaces
-workflow state schema
+Add node
+Add routing
+Update state
 
-If state changes:
-update related agents.
+Add tool:
 
----
+Register MCP server
 
-# Known Issues
+Add verification:
 
-Possible issues:
-
-ReflexionAgent may not be triggered.
-Final answer sometimes not set.
-Verification routing duplication.
-State overwrite conflicts.
-
-Fix root causes instead of patching.
+Extend VerificationAgent
 
 ---
 
-# How Claude Should Modify Code
+# Testing Strategy
 
-When updating files:
+Unit test:
 
-Provide FULL updated file.
+Agents
+Retriever
+Workflow routing
 
-Do NOT provide partial patches unless requested.
+Integration test:
 
-Do NOT change:
-architecture
-agent responsibilities
-state structure
-
-Unless explicitly asked.
-
-Explain changes briefly.
-
-Minimize unnecessary refactors.
+Full pipeline.
 
 ---
 
-# Output Expectations
+# Philosophy
 
-When fixing bugs:
+Correct > Fast
 
-1 Explain problem
-2 Explain root cause
-3 Provide fix
-4 Provide updated file
+Grounded > Creative
 
-When suggesting improvements:
-
-List:
-Issue
-Risk
-Improvement
-
----
-
-# Anti Patterns To Avoid
-
-Do NOT:
-
-Duplicate agent logic.
-Mix verification and generation.
-Let agents modify unrelated state.
-Add hidden dependencies.
-Break async execution.
-
----
-
-# Preferred Patterns
-
-Prefer:
-
-Small focused agents.
-Clear state transitions.
-Deterministic routing.
-Observable failures.
-Idempotent agent execution.
-
----
-
-# Project Goal
-
-Build a reliable agentic RAG system that:
-
-Minimizes hallucinations.
-Produces grounded answers.
-Is easy to extend.
-Is production safe.
-
----
-
-# Claude Instructions
-
-Assume:
-
-User is building production grade AI system.
-
-Always:
-
-Preserve architecture.
-Improve reliability.
-Improve clarity.
-Reduce hidden bugs.
-
-Never:
-
-Simplify into toy examples unless asked.
-Remove important engineering patterns.
+Deterministic > Fancy
