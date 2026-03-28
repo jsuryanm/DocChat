@@ -18,6 +18,9 @@ class EmptyRetriever:
 
     def invoke(self,query: str):
         return []
+    
+    async def ainvoke(self,query: str):
+        return []
 
 class RetrieverBuilder: 
     
@@ -61,18 +64,16 @@ class RetrieverBuilder:
             
             if persist and Path(settings.CHROMA_DB_PATH).exists():
                 logger.info("Loading existing CHROMADB")
-                vector_store = await asyncio.to_thread(Chroma.from_documents,
-                                                       documents=docs,
-                                                       embedding_function=embeddings,
-                                                       persist_directory=settings.CHROMA_DB_PATH,
-                                                       collection_name=settings.CHROMA_COLLECTION_NAME)
+                vector_store = await asyncio.to_thread(lambda: Chroma(persist_directory=settings.CHROMA_DB_PATH,
+                                                                      embedding_function=embeddings,
+                                                                      collection_name=settings.CHROMA_COLLECTION_NAME))
                 
             
             else:
                 logger.info("Creating new CHROMADB")
                 vector_store = await asyncio.to_thread(Chroma.from_documents,
                                                        documents=docs,
-                                                       embedding_function=embeddings,
+                                                       embedding=embeddings,
                                                        persist_directory=settings.CHROMA_DB_PATH,
                                                        collection_name=settings.CHROMA_COLLECTION_NAME)
 
@@ -104,7 +105,7 @@ class RetrieverBuilder:
         try:
             reranker = await self._get_reranker()
 
-            logger.info(f"BM25 docs: {len(docs)}")
+            logger.info(f"Reranking {len(docs)} docs")
             logger.info(f"Vector search k:{settings.VECTOR_SEARCH_K}")
 
             batch_size = settings.RERANK_BATCH_SIZE
@@ -112,18 +113,19 @@ class RetrieverBuilder:
             doc_texts = [d.page_content for d in docs]
 
             batches = [
-                doc_texts[i:i+batch_size]
+                [(query,text) for text in doc_texts[i: i + batch_size]]
                 for i in range(0,len(doc_texts),batch_size)
             ]
 
             tasks = [
-                asyncio.to_thread(reranker.score,query,batch)
+                asyncio.to_thread(reranker.score,batch)
                 for batch in batches
             ]
 
             results = await asyncio.gather(*tasks)
 
-            scores = [s for batch in results for s in batch]
+            scores = [s for batch_scores in results 
+                      for s in batch_scores]
                         
             if len(scores) != len(docs):
                 logger.warning("Rerank score mismatch")

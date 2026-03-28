@@ -10,6 +10,8 @@ class AgentState(TypedDict):
 
     documents: List[Document]
     reranked_docs: List[Document]
+
+    relevance_label: str
     
     draft_answer: str 
     final_answer: str 
@@ -27,5 +29,5 @@ class AgentState(TypedDict):
     mcp_tool_call_results: Annotated[List[str],operator.add]
 
     # A2A
-    # True whenn the draft_answer originated from remote to A2A agent
+    # True when the draft_answer originated from remote to A2A agent
     delegated: bool

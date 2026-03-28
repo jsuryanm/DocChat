@@ -14,14 +14,9 @@ class RelevanceChecker:
     PROMPT_TEMPLATE = ChatPromptTemplate.from_messages([
     (
         "system",
-        "You are a strict relevance classifier. Your only job is to decide "
-        "whether the provided passages contain information to answer the question.\n\n"
-        "Reply with ONLY one label:\n"
-        "CAN_ANSWER: the passages contain direct, explicit information that answers the question\n"
-        "PARTIAL: the passages mention the topic but lack enough detail to fully answer\n"
-        "NO_MATCH: the passages do not mention the specific subject of the question at all\n\n"
-        "IMPORTANT: If the question asks about a specific product, person, or entity "
-        "that is NOT mentioned by name in the passages, reply NO_MATCH."
+        "You are a strict relevance classifier.\n"
+        "Return ONLY one word:\n"
+        "CAN_ANSWER or PARTIAL or NO_MATCH"   
     ),
     (
         "human",
@@ -64,15 +59,22 @@ class RelevanceChecker:
             logger.warning(f"RelevnaceChecker chain error: {e}")
             return "NO_MATCH"
         
-        label = response.strip().upper()
+        label = (
+            response
+            .strip()
+            .upper()
+            .replace(".","")
+            .replace(":","")
+        )
 
-        valid = {"CAN_ANSWER","PARTIAL","NO_MATCH"}
+        if label.startswith("CAN_ANSWER"):
+            return "CAN_ANSWER"
 
-        for v in valid:
-        
-            if v in label:
-                logger.info(f"Relevance classification: {v}")
-                return v
+        if label.startswith("PARTIAL"):
+            return "PARTIAL"
+
+        if label.startswith("NO_MATCH"):
+            return "NO_MATCH"
         
         logger.warning(f"Unrecognized label: {label}")
         return "NO_MATCH"

@@ -1,4 +1,5 @@
 from langgraph.graph import StateGraph,START,END
+from langgraph.prebuilt import ToolNode
 
 from src.agents.state import AgentState
 from src.agents.query_rewriter import QueryRewriter
@@ -6,7 +7,11 @@ from src.agents.research_agent import ResearchAgent
 from src.agents.verfication_agent import VerificationAgent
 from src.agents.answer_grader import AnswerGrader
 from src.agents.reflexion_agent import ReflexionAgent
+from src.agents.relevance_checker import RelevanceChecker
+from src.tools.mcp_client import get_tools 
+from src.a2a.client import call_remote_agent
 
+from src.config.settings import settings
 from src.custom_logger.logger import logger 
 
 class AgentWorkflow:
@@ -21,7 +26,11 @@ class AgentWorkflow:
         self.rewrite = QueryRewriter()
         self.grade = AnswerGrader()
         self.reflect = ReflexionAgent()
+        self.relevance = RelevanceChecker()
 
+        self.mcp_tools = get_tools()
+        self.tool_node = ToolNode(self.mcp_tools) if self.mcp_tools else None
+        
         self.graph = self._build()
     
     def _build(self):
@@ -30,17 +39,42 @@ class AgentWorkflow:
         g.add_node("rewrite",self._rewrite)
         g.add_node("retrieve",self._retrieve)
         g.add_node("rerank",self._rerank)
+        g.add_node("check_relevance",self._check_relevance)
         g.add_node("research",self._research)
         g.add_node("grade",self._grade)
         g.add_node("verify",self._verify)
         g.add_node("reflect",self._reflect)
         g.add_node("finalize",self._finalize)
+        g.add_node("delegate",self._delegate)
+
+        if self.tool_node:
+            g.add_node("tools",self.tool_node)
 
         g.add_edge(START,"rewrite")
         g.add_edge("rewrite","retrieve")
         g.add_edge("retrieve","rerank")
-        g.add_edge("rerank","research")
-        g.add_edge("research","grade")
+
+        g.add_conditional_edges("rerank",
+                                self._route_after_rerank,
+                                {"delegate":"delegate",
+                                 "check_relevance":"check_relevance"})
+        
+        g.add_conditional_edges("check_relevance",
+                                self._route_after_relevance,
+                                {"research":"research",
+                                 "finalize":"finalize"})
+
+        if self.tool_node:
+            g.add_conditional_edges("research",
+                                    self._route_after_research,
+                                    {"tools":"tools",
+                                     "grade":"grade"})
+
+            g.add_edge("tools","research")
+        
+        else:
+            g.add_edge("research","grade")
+
         g.add_edge("grade","verify")
 
         g.add_conditional_edges("verify",
@@ -50,6 +84,7 @@ class AgentWorkflow:
                                  "stop":"finalize"})
         
         g.add_edge("reflect","rewrite")
+        g.add_edge("delegate","finalize")
         g.add_edge("finalize",END)
 
         return g.compile()
@@ -79,14 +114,24 @@ class AgentWorkflow:
         return {"reranked_docs":reranked,
                 "reasoning_steps":["Documents reranked"]}
     
+    async def _check_relevance(self,state):
+        logger.info("Checking relevance")
+        label = await self.relevance.check(question=state["rewritten_question"],
+                                           retriever=self.retriever)
+        logger.info(f"Relevance label: {label}")
+        return {"relevance_label":label,
+                "reasoning_steps":[f"Reasoning check: {label}"]}
+    
     async def _research(self,state):
         logger.info("Generating answer")
 
         result = await self.research.generate(state["rewritten_question"],
-                                              state["reranked_docs"])
+                                              state["reranked_docs"],
+                                              relevance=state.get("relevance_label"))
         
         return {"draft_answer":result['draft_answer'],
                 "confidence":result["confidence"],
+                "tool_calls":result.get("tool_calls",[]),
                 "draft_history":[result["draft_answer"]],
                 "reasoning_steps":["Research agent generated an answer"]}
     
@@ -115,9 +160,52 @@ class AgentWorkflow:
         return {"retry_count":retries,
                 "reasoning_steps":[f"Retry attempt {retries}"]}
     
-    def _route_after_verify(self,state):
+    async def _finalize(self,state):
+        return {"final_answer":state["draft_answer"],
+                "reasoning_steps":["Final answer accepted"]}
+    
+    async def _delegate(self,state):
+        """Call remote A2A agent when local docs are empty"""
+        logger.info("Delegating to remote A2A agent")
 
+        try:
+            answer = await call_remote_agent(settings.REMOTE_AGENT_URL,
+                                             state["rewritten_question"])
+            return {"draft_answer":answer,
+                    "delegated":True,
+                    "reasoning_steps":["Answer delegated to remote A2A agent"]}
+        
+        except Exception as e:
+            logger.error(f"A2A delegation failed: {e}")
+            return {"draft_answer":"Could not retrieve answer from remote agent",
+                    "delegated":True,
+                    "reasoning_steps":["A2A delegation failed"]}
+        
+    def _route_after_relevance(self,state):
+        if state["relevance_label"] == "NO_MATCH":
+            return "finalize"
+        return "research"
+            
+    def _route_after_rerank(self,state):
+        """Delegate via A2A if no documents were retrieved"""
+        if not state.get("reranked_docs") and settings.REMOTE_AGENT_URL:
+            logger.info("No local docs -> routing to A2A delegate")
+            return "delegate"
+        return "check_relevance"
+
+    def _route_after_research(self,state):
+        """Route to MCP ToolNode if LLM emitted tool calls"""
+        if state.get("tool_calls"):
+            logger.info(f"Tool calls detected: {len(state['tool_calls'])} -> routing to tools")
+            return "tools"
+        return "grade" 
+
+    def _route_after_verify(self,state):
         logger.info("Routing decision")
+
+        if state.get("relevance_label") == "NO_MATCH":
+            logger.info("No relevant docs -> stopping")
+            return "stop"
 
         decision = self.reflect.decide(grounded=state["grounded"],
                                        quality=state["answer_quality"],
@@ -129,13 +217,10 @@ class AgentWorkflow:
             state["final_answer"] = state["draft_answer"]
             return "accept"
 
-        if decision == "stop":
-            logger.info("Retry limit reached")
-            state["final_answer"] = state["draft_answer"]
-            return "stop"
-
-        logger.info("Retrying research")
-        return "retry"
+        if decision == "retry":
+            return "retry"
+        
+        return "stop"
     
     async def _finalize(self,state):
         return {"final_answer":state["draft_answer"],
@@ -155,12 +240,17 @@ class AgentWorkflow:
                    "retry_count":0,
                    "failure_reason":"",
                    "draft_history":[],
-                   "reasoning_steps":[]}
+                   "reasoning_steps":[],
+                   "tool_calls":[],
+                   "mcp_tool_results":[],
+                   "delegated":False,
+                   "relevance_label":""}
         
         final = await self.graph.ainvoke(initial)
 
         return {"final_answer":final["final_answer"],
                 "draft_history":final["draft_history"],
                 "reasoning_steps":final["reasoning_steps"],
-                "retries":final["retry_count"]}
+                "retries":final["retry_count"],
+                "delegated":final.get("delegated",False)}
         

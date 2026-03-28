@@ -36,5 +36,6 @@ pytest-asyncio
 python-dotenv
 loguru
 httpx
+nest_asyncio
 
 streamlit

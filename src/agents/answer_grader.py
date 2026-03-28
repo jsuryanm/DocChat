@@ -9,14 +9,22 @@ class AnswerGrade(BaseModel):
     quality: str = Field()
     reason: str = Field()
 
-
-_SYSTEM = """Grade answer quality:
-            
-            HIGH
-            MEDIUM
-            LOW
-            
-            Based on completeness"""
+_SYSTEM = """You are an answer quality grader.
+ 
+Given a question and an answer, assign one of three quality labels:
+ 
+HIGH   — The answer is complete, directly addresses the question,
+          contains no unsupported claims, and requires no follow-up.
+ 
+MEDIUM — The answer partially addresses the question, may lack detail,
+          or contains minor gaps that don't make it wrong.
+ 
+LOW    — The answer is incomplete, off-topic, contradicts the question,
+          or states it cannot answer due to missing context.
+ 
+Return ONLY the label (HIGH / MEDIUM / LOW) and a one-sentence reason.
+Do not add any other text.
+"""
 
 class AnswerGrader:
     
@@ -33,7 +41,9 @@ class AnswerGrader:
              {question}
              
              Answer:
-             {answer}""")
+             {answer}
+             
+             Grade the answer.""")
         ])
 
         self.chain = (

@@ -29,9 +29,11 @@ async def startup() -> None:
     
     try:
         _client = MultiServerMCPClient(servers)
-        await _client.__aenter__()
-        _tools = _client.get_tools()
-        logger.info(f"MCP client ready | {len(_tools)} tools: {[tool.name for tool in _tools]}")
+        _tools = await _client.get_tools()
+        logger.info(
+            f"MCP client ready | {len(_tools)} tools: "
+            f"{[tool.name for tool in _tools]}"
+        )
     
     except Exception as e:
         logger.error(f"MCP client startup failed: {e}")
@@ -48,7 +50,8 @@ async def shutdown():
     logger.info("Shutting down MCP client")
 
     try:
-        await _client.__aexit__(None,None,None)
+        if hasattr(_client,"close"):
+            await _client.close()
     except Exception as e:
         logger.warning(f"MCP client shutdown error (non-fatal):{e}")
     finally:

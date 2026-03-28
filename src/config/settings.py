@@ -21,12 +21,12 @@ class Settings(BaseSettings):
     RESEARCH_MODEL: str = "gpt-5-mini"
     VERIFY_MODEL: str = "gpt-5-nano"
 
-    EMBEDDINGS_MODEL: str = "text-embeddings-3-small"
+    EMBEDDINGS_MODEL: str = "text-embedding-3-small"
     EMBEDDINGS_BATCH_SIZE: int = 100
 
-    RESEARCH_MAX_TOKENS: int = 512 
-    VERIFY_MAX_TOKENS: int = 256 
-    RELEVANCE_MAX_TOKENS: int = 10
+    RESEARCH_MAX_TOKENS: int = 800
+    VERIFY_MAX_TOKENS: int = 1200
+    RELEVANCE_MAX_TOKENS: int = 30
 
     RERANKER_MODEL: str = "cross-encoder/ms-marco-MiniLM-L-6-v2"
     RERANK_BATCH_SIZE: int = 16

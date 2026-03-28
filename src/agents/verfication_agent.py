@@ -36,8 +36,8 @@ Return only structured output.
 
 
 class VerificationAgent:
-    MAX_DOCS = 4
-    MAX_CHARS = 400
+    MAX_DOCS = 3
+    MAX_CHARS = 250
     TIMEOUT = 30
 
 
@@ -87,7 +87,13 @@ class VerificationAgent:
                                      "context":context})
         except Exception as e:
             logger.error(f"VerificationAgent error: {e}")
-            raise RuntimeError("Verification failed") from e
+            return {"supported":"UNKNOWN",
+                    "unsupported_claims":[],
+                    "contradictions":[],
+                    "relevant":"UNKNOWN",
+                    "additional_details":"verification failed",
+                    "verification_report":"verification failed",
+                    "context_used":context}
 
 
         report = self._format(result)

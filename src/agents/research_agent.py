@@ -11,6 +11,7 @@ from langchain_core.output_parsers import StrOutputParser
 
 from src.config.settings import settings 
 from src.custom_logger.logger import logger 
+from src.tools.mcp_client import get_tools
 
 _SYSTEM_PROMPT = """You are a research agent in a RAG system.
 
@@ -56,18 +57,23 @@ class ResearchAgent:
     MAX_CHARS = 500
     TIMEOUT = 45
 
-    def __init__(self,llm: Optional[ChatOpenAI] = None):
+    def __init__(self,llm = None):
 
         
-        self.llm = ChatOpenAI(model=settings.RESEARCH_MODEL,
+        self.llm = llm or ChatOpenAI(model=settings.RESEARCH_MODEL,
                                     temperature=0.1,
                                     max_completion_tokens=settings.RESEARCH_MAX_TOKENS,
                                     api_key=settings.OPENAI_API_KEY)
-                
-        self.chain = (
-            RESEARCH_PROMPT 
-            | self.llm.with_structured_output(ResearchResult)    
-        )
+        
+        mcp_tools = get_tools()
+        if mcp_tools:
+            self.llm_with_tools = self.llm.bind_tools(mcp_tools)
+            self.chain = RESEARCH_PROMPT | self.llm_with_tools.with_structured_output(ResearchResult)
+        
+        else:
+            self.llm_with_tools  = self.llm
+            self.chain = RESEARCH_PROMPT | self.llm.with_structured_output(ResearchResult)
+
     
     @retry(stop=stop_after_attempt(3),
            wait=wait_exponential(min=1,max=8))
@@ -81,12 +87,13 @@ class ResearchAgent:
                        relevance: Optional[str] = None) -> Dict:
         
         if relevance == "NO_MATCH":
-            logger.info("Skipping research due to NO_MATCH")
+            logger.info("Skipping research because is relevance label is NO_MATCH")
 
             return {"draft_answer":"Insufficient relevant context.",
                     "confidence":"LOW",
                     "context_used":"",
-                    "doc_count":0}
+                    "doc_count":0,
+                    "tool_calls":[]}
 
         try:
             context = self._compress_documents(documents)
@@ -107,7 +114,8 @@ class ResearchAgent:
                 "missing_information":result.missing_information,
                 "context_used":context,
                 "doc_count":len(documents),
-                "model":settings.RESEARCH_MODEL}
+                "model":settings.RESEARCH_MODEL,
+                "tool_calls":[]}
     
     async def stream(self,
                      question: str,
