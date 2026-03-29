@@ -11,7 +11,7 @@
 </p>
 
 <p align="center">
-  <strong>Production-grade Agentic RAG pipeline with self-correction, grounding verification, web search fallback, and multi-agent orchestration via A2A protocol.</strong>
+  <strong>Agentic RAG pipeline with self-correction, grounding verification, web search fallback, and multi-agent orchestration via A2A protocol.</strong>
 </p>
 
 ---
@@ -38,9 +38,7 @@
 
 ## Overview
 
-DocChat is **not** a simple retrieve-and-answer RAG system.
-
-It is a self-correcting agent pipeline that:
+DocChat is a self-correcting agent pipeline that:
 
 1. **Rewrites** the user query for better retrieval
 2. **Retrieves** documents using hybrid BM25 + vector search
@@ -266,20 +264,35 @@ docchat/
 
 ## Quick Start
 
-### Prerequisites
+### Requirements
 
-- Python 3.12+
+- Python - 3.12.12
+- uv package manager 
 - An OpenAI API key
 - A Tavily API key (for web search fallback; optional but recommended)
 
 ### 1. Clone and install
 
 ```bash
+1. Setup uv package manager
+
+pip install uv 
+uv venv --python 3.12.12
+uv init
+
+2. Clone the repository
+
 git clone https://github.com/your-org/docchat.git
 cd docchat
-python -m venv .venv
-source .venv/bin/activate          # Windows: .venv\Scripts\activate
-pip install -e .
+
+3. Install requirements.txt
+Activate virtual environemnt
+
+.venv/bin/activate          
+# Windows: .venv\Scripts\activate
+
+uv add -r requirements.txt
+uv pip install -e .
 ```
 
 ### 2. Configure environment
