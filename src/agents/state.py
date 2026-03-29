@@ -37,7 +37,7 @@ class AgentState(TypedDict):
     # the key written in AgentWorkflow.run() initial state.  The mismatch was
     # a latent KeyError waiting to surface under certain LangGraph reducer paths.
     mcp_tool_results: Annotated[List[str], operator.add]
-
+    web_used: bool  # True when Tavily web search was used
     # A2A
     # True when draft_answer originated from a remote A2A agent
     delegated: bool

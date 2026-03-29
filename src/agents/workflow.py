@@ -8,6 +8,7 @@ from src.agents.verfication_agent import VerificationAgent
 from src.agents.answer_grader import AnswerGrader
 from src.agents.reflexion_agent import ReflexionAgent
 from src.agents.relevance_checker import RelevanceChecker
+from src.agents.web_search_agent import WebSearchAgent
 from src.tools.mcp_client import get_tools
 from src.a2a.client import call_remote_agent
 
@@ -28,6 +29,7 @@ class AgentWorkflow:
         self.grade = AnswerGrader()
         self.reflect = ReflexionAgent()
         self.relevance = RelevanceChecker()
+        self.web_search = WebSearchAgent()
 
         self.mcp_tools = get_tools()
         self.tool_node = ToolNode(self.mcp_tools) if self.mcp_tools else None
@@ -46,6 +48,7 @@ class AgentWorkflow:
         g.add_node("rerank", self._rerank)
         g.add_node("check_relevance", self._check_relevance)
         g.add_node("research", self._research)
+        g.add_node("web_search", self._web_search)
         g.add_node("grade", self._grade)
         g.add_node("verify", self._verify)
         g.add_node("reflect", self._reflect)
@@ -66,10 +69,12 @@ class AgentWorkflow:
         )
 
         g.add_conditional_edges(
-            "check_relevance",
-            self._route_after_relevance,
-            {"research": "research", "finalize": "finalize"},
-        )
+        "check_relevance",
+        self._route_after_relevance,
+        {"research": "research", "web_search": "web_search", "finalize": "finalize"},)
+        
+        
+        g.add_edge("web_search", "grade")
 
         if self.tool_node:
             g.add_conditional_edges(
@@ -152,6 +157,17 @@ class AgentWorkflow:
         return {
             "answer_quality": result["quality"],
             "reasoning_steps": [f"Answer quality = {result['quality']}"],
+        }
+    
+    async def _web_search(self, state):
+        logger.info("Falling back to Tavily web search")
+        result = await self.web_search.search(state["rewritten_question"])
+        return {
+            "draft_answer": result["draft_answer"],
+            "web_used": result["web_used"],
+            "confidence": result["confidence"],
+            "draft_history": [result["draft_answer"]],
+            "reasoning_steps": ["Web search used (no relevant local docs)"],
         }
 
     async def _verify(self, state):
@@ -252,10 +268,16 @@ class AgentWorkflow:
         return "check_relevance"
 
     def _route_after_relevance(self, state):
-        if state["relevance_label"] == "NO_MATCH":
-            logger.info("No relevant docs found — short-circuiting to finalize")
+        label = state["relevance_label"]
+        if label == "NO_MATCH":
+            if self.web_search.available:
+                logger.info("NO_MATCH + Tavily available -> routing to web_search")
+                return "web_search"
+            logger.info("NO_MATCH + no web search -> finalize")
             return "finalize"
         return "research"
+
+
 
     def _route_after_research(self, state):
         """Route to MCP ToolNode if LLM emitted tool calls."""
@@ -330,6 +352,7 @@ class AgentWorkflow:
             "confidence": "",
             "answer_quality": "",
             "grounded": False,
+            "web_used":False,
             # FIX: initialise verification_failed so the field is always
             # present in state from the first node onwards.
             "verification_failed": False,
@@ -353,4 +376,5 @@ class AgentWorkflow:
             "reasoning_steps": final["reasoning_steps"],
             "retries": final["retry_count"],
             "delegated": final.get("delegated", False),
+            "web_used":final.get("web_used",False)
         }
