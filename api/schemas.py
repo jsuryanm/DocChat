@@ -20,5 +20,5 @@ class UploadResponse(BaseModel):
 
 class HealthResponse(BaseModel):
     status: str 
-    mcp_ready: int
-    retriever_ready: List[str]
+    mcp_ready: bool
+    retriever_ready: bool

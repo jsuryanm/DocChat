@@ -64,10 +64,16 @@ class RetrieverBuilder:
             
             if persist and Path(settings.CHROMA_DB_PATH).exists():
                 logger.info("Loading existing CHROMADB")
-                vector_store = await asyncio.to_thread(lambda: Chroma(persist_directory=settings.CHROMA_DB_PATH,
-                                                                      embedding_function=embeddings,
-                                                                      collection_name=settings.CHROMA_COLLECTION_NAME))
-                
+                vector_store = await asyncio.to_thread(
+                lambda: Chroma(
+                    persist_directory=settings.CHROMA_DB_PATH,
+                    embedding_function=embeddings,
+                    collection_name=settings.CHROMA_COLLECTION_NAME,
+                ))
+
+                if docs:
+                    await asyncio.to_thread(vector_store.add_documents, docs)
+                    
             
             else:
                 logger.info("Creating new CHROMADB")
@@ -136,8 +142,11 @@ class RetrieverBuilder:
                             key=lambda x:x[1],
                             reverse=True)
         
-            return [d for d,_ in ranked[:settings.RERANKER_TOP_N]]
-        
+            top = ranked[:settings.RERANKER_TOP_N]
+            for doc, score in top:
+                doc.metadata["score"] = score
+            return [d for d, _ in top]
+
         except Exception as e:
             logger.error(f"Rerank failed: {e}")
 

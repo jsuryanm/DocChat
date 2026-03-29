@@ -59,7 +59,7 @@ async def upload_documents(files: List[UploadFile] = File(...)):
         raise HTTPException(status_code=500,detail=str(e))
 
 @router.post("/chat/invoke",response_model=ChatResponse)
-async def chat(request: ChatResponse):
+async def chat(request: ChatRequest):
     if not request.question.strip():
         raise HTTPException(status_code=400,detail="Question cannot be empty")
     
