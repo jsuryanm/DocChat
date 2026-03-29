@@ -282,7 +282,7 @@ uv init
 
 2. Clone the repository
 
-git clone https://github.com/your-org/docchat.git
+git clone https://github.com/jsuryanm/DocChat.git
 cd docchat
 
 3. Install requirements.txt
