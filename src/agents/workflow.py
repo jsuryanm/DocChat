@@ -202,7 +202,7 @@ class AgentWorkflow:
         }
 
     def _reflect(self, state):
-        logger.info("Retry triggered")
+        logger.info("Retrfy triggered")
         retries = state.get("retry_count", 0) + 1
         return {
             "retry_count": retries,
@@ -287,36 +287,26 @@ class AgentWorkflow:
             )
             return "tools"
         return "grade"
-
+    
     def _route_after_verify(self, state):
         logger.info("Routing decision after verify")
 
-        # FIX: check verification_failed FIRST, before any other branch.
-        # A tool/LLM crash inside the verify node sets this flag.  Allowing
-        # such a crash to fall through to reflect.decide() (which sees
-        # grounded=False) would trigger a content-quality retry on what is
-        # purely an infrastructure failure — potentially discarding a valid
-        # first-round answer, as observed in the production logs.
         if state.get("verification_failed"):
-            logger.warning(
-                "Verification tool failed — accepting current answer without retry"
-            )
+            logger.warning("Verification tool failed — accepting current answer without retry")
             return "accept"
 
-        # Delegated answers must never trigger a retry: there are no local
-        # documents to retrieve against and re-running the loop would cycle.
         if state.get("delegated"):
             grounded = state.get("grounded", False)
             quality = state.get("answer_quality", "")
-            logger.info(
-                f"Delegated answer — skipping retry | grounded={grounded} quality={quality}"
-            )
+            logger.info(f"Delegated answer — skipping retry | grounded={grounded} quality={quality}")
             return "accept"
 
-        # FIX: moved NO_MATCH check AFTER verification_failed and delegated.
-        # Previously this was the first branch, which meant a NO_MATCH set
-        # on a previous pass could incorrectly short-circuit a retry that had
-        # since produced a valid CAN_ANSWER result.
+        # ADD THIS: web search answers have no local docs to verify against,
+        # so grounded=False is expected — accept and move on
+        if state.get("web_used"):
+            logger.info("Web search answer — skipping retry, accepting")
+            return "accept"
+
         if state.get("relevance_label") == "NO_MATCH":
             logger.info("No relevant docs -> stopping")
             return "stop"
@@ -336,6 +326,7 @@ class AgentWorkflow:
             return "retry"
 
         return "stop"
+
 
     # ------------------------------------------------------------------
     # Entry point
