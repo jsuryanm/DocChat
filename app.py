@@ -117,7 +117,7 @@ question = st.text_input(
     placeholder="e.g. What were the key findings in the Q3 report?",
 )
 
-if st.button("▶ Run", disabled=not (uploaded_files and question.strip()), type="primary"):
+if st.button("Run", disabled=not (uploaded_files and question.strip()), type="primary"):
     st.session_state.result = None
     st.session_state.error = None
 
