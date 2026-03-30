@@ -7,7 +7,6 @@
   <img src="https://img.shields.io/badge/Streamlit-1.55+-FF4B4B?style=flat-square&logo=streamlit&logoColor=white" />
   <img src="https://img.shields.io/badge/ChromaDB-1.5+-orange?style=flat-square" />
   <img src="https://img.shields.io/badge/License-MIT-green?style=flat-square" />
-  <img src="https://img.shields.io/badge/Status-Production%20Ready-brightgreen?style=flat-square" />
 </p>
 
 <p align="center">
@@ -314,9 +313,9 @@ TAVILY_API_KEY=tvly-...
 REMOTE_AGENT_URL=http://localhost:9001
 
 # Optional overrides (defaults shown)
-RESEARCH_MODEL=gpt-4o-mini
-VERIFY_MODEL=gpt-4o-mini
-RELEVANCY_MODEL=gpt-4o-mini
+RESEARCH_MODEL=gpt-5-mini
+VERIFY_MODEL=gpt-5-nano
+RELEVANCY_MODEL=gpt-5-nano
 RERANKER_MODEL=cross-encoder/ms-marco-MiniLM-L-6-v2
 VECTOR_SEARCH_K=8
 RERANKER_TOP_N=3
@@ -501,39 +500,6 @@ streamlit run app.py
 
 ---
 
-## Testing
-
-### Run all tests
-
-```bash
-pytest tests/ -v
-```
-
-### Run a specific module
-
-```bash
-pytest tests/test_workflow.py -v
-pytest tests/test_builder.py -v
-```
-
-### Run with coverage
-
-```bash
-pytest tests/ --cov=src --cov-report=term-missing
-```
-
-### Test design
-
-Unit tests use injected fakes — no real LLM or network calls are made. `FakeChain`, `FakeRetriever`, `FakeResearch`, and `FakeReranker` fixtures keep the suite fast, deterministic, and free to run in CI.
-
-Tests that make real LLM calls are marked `@pytest.mark.integration` and require valid API keys:
-
-```bash
-pytest tests/ -v -m integration
-```
-
----
-
 ## Design Decisions
 
 **Why LangGraph instead of a simple chain?**
@@ -610,10 +576,4 @@ RUN python -c "from sentence_transformers import CrossEncoder; CrossEncoder('cro
 
 ## License
 
-MIT License. See [LICENSE](LICENSE) for details.
-
----
-
-<p align="center">
-  Built with LangGraph · LangChain · FastAPI · ChromaDB · Docling
-</p>
+MIT License
