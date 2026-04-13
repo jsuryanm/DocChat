@@ -9,27 +9,6 @@ from src.config.settings import settings
 from src.custom_logger.logger import logger
 
 
-# AgentCard: agent metadata definition
-# A2AStarletteApplication: Creates HTTP server 
-# AgentExecutor: Base class every A2A agent must implement
-# RequestContext: Incoming request data
-# TaskUpdater: Used to send progress updates
- 
-"""The  goal of this client.py is:
-1. Creating an A2A executor runs the workflow
-2. Define agent metadata
-3. Creates A2A HTTP server
-
-External Agent
-      |
-A2A HTTP Server
-      |
-DocChatA2AExecutor
-      |
-AgentWorkflow.run()
-      |
-Final Answer returned
-"""
 
 class DocChatA2AExector(AgentExecutor):
 
@@ -38,11 +17,6 @@ class DocChatA2AExector(AgentExecutor):
 
     
     async def execute(self,context: RequestContext, updater: TaskUpdater) -> None:
-        """Called by A2A server for every incoming task 
-        
-        1. Extract User's question from the A2A message
-        2. Run the full AgentWorkflow (rewrite -> retrieve -> verify)
-        3. Push the final answer back as an A2A artifact"""
 
         question = self._extract_text(context)
 
@@ -55,7 +29,6 @@ class DocChatA2AExector(AgentExecutor):
 
         try:
             updater.start_work() 
-            # starts task useful for streaming,monitoring and progress tracking 
 
             result = await self.workflow.run(question)
             answer = result.get("final_answer","No answer produced.")
@@ -63,10 +36,8 @@ class DocChatA2AExector(AgentExecutor):
 
             await updater.add_artifact(parts=[new_agent_text_message(answer)],
                                        name="answer")
-            # Sends result back to caller agent 
             
             updater.complete()
-            # complete task 
         
         except Exception as e:
             logger.error(f"A2A executor error: {e}")
@@ -74,13 +45,10 @@ class DocChatA2AExector(AgentExecutor):
 
     
     async def cancel(self, context: RequestContext, updater: TaskUpdater) -> None:
-        """Cancellation is not supported — raise to signal this to the caller."""
         raise UnsupportedOperationError("DocChat does not support task cancellation")
     
     @staticmethod 
     def _extract_text(context: RequestContext) -> str:
-        """ Pull plain text from the first text part of the incoming A2A message.
-        Returns an empty string if no text part is found."""
         try:
             for part in context.message.parts:
                 root = getattr(part,"root",part)
@@ -91,7 +59,6 @@ class DocChatA2AExector(AgentExecutor):
         
         return ""
 
-# agent card 
 
 def build_agent_card() -> AgentCard:
     """Describes agent to A2A ecosystem 
@@ -112,7 +79,6 @@ def build_agent_card() -> AgentCard:
                             default_input_modes=["text"],
                             default_output_modes=["text"])
 
-# factory 
 def create_a2a_app(workflow) -> A2AStarletteApplication:
     """Build and return Starlette ASGI app that serves the DocChat agent over A2A protocol"""
     executor = DocChatA2AExector(workflow)

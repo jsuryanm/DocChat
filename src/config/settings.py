@@ -27,19 +27,8 @@ class Settings(BaseSettings):
 
     RESEARCH_MAX_TOKENS: int = 1600
 
-    # FIX: raised from 400 → 1000.
-    # gpt-5-nano (and any reasoning-model variant) allocates reasoning tokens
-    # against max_tokens BEFORE producing the structured output field.
-    # 400 tokens was reliably exhausted before the JSON was emitted, causing
-    # LengthFinishReasonError on every verify call and triggering a spurious
-    # retry loop that discarded a valid answer.
     VERIFY_MAX_TOKENS: int = 1500
 
-    # FIX: raised from 200 → 500.
-    # Same root cause as VERIFY_MAX_TOKENS: the reasoning model consumed all
-    # 200 tokens for chain-of-thought and had none left for the label field,
-    # which caused the retry-pass relevance check to return NO_MATCH and
-    # finalize with the "no relevant docs" fallback message.
     RELEVANCE_MAX_TOKENS: int = 500
 
     RERANKER_MODEL: str = "cross-encoder/ms-marco-MiniLM-L-6-v2"

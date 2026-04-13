@@ -9,14 +9,12 @@ from src.custom_logger.logger import logger
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # ---- startup ----
     logger.info("Starting DocChat API")
-    await mcp_startup()          # loads Tavily MCP tool
-    await a2a_startup()          # persistent A2A HTTP client
-    await init_singletons()      # builds RetrieverBuilder + empty-retriever workflow
+    await mcp_startup()          
+    await a2a_startup()          
+    await init_singletons()      
     logger.info("DocChat API ready")
     yield
-    # ---- shutdown ----
     logger.info("Shutting down DocChat API")
     await mcp_shutdown()
     await a2a_shutdown()

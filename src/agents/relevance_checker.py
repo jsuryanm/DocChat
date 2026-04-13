@@ -5,14 +5,10 @@ from langchain_openai import ChatOpenAI
 from langchain_core.documents import Document
 from langchain_core.prompts import ChatPromptTemplate
 
-# FIX: import the specific OpenAI exception so we can tell a token-limit
-# crash apart from a genuine retrieval failure.
 try:
     from openai import LengthFinishReasonError
 except ImportError:
-    # Fallback for openai SDK versions that don't expose this symbol at the
-    # top level — define a sentinel that will never match.
-    LengthFinishReasonError = None  # type: ignore[assignment,misc]
+    LengthFinishReasonError = None  
 
 from src.config.settings import settings
 from src.custom_logger.logger import logger
@@ -93,13 +89,6 @@ class RelevanceChecker:
             label = result.label.strip().upper()
             logger.debug(f"RelevanceChecker structured output: {repr(label)}")
 
-        # FIX: LengthFinishReasonError means the model ran out of tokens before
-        # it could emit the structured label — this is a tool/config failure,
-        # NOT evidence that the documents are irrelevant.  Returning NO_MATCH
-        # here caused the retry-pass to short-circuit to finalize and discard
-        # a valid first-round answer.  Return PARTIAL instead: the pipeline
-        # will still proceed to research, and the answer quality + grounding
-        # checks downstream will decide whether to accept or retry.
         except Exception as e:
             if LengthFinishReasonError is not None and isinstance(e, LengthFinishReasonError):
                 logger.warning(

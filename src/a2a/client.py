@@ -16,8 +16,6 @@ _client_cache: Dict[str, A2AClient] = {}
 
 
 async def startup() -> None:
-    """Create the persistent HTTP client.
-    Must be called once at application startup before any A2A calls."""
     global _http_client
     if _http_client is not None:
         return
@@ -26,8 +24,6 @@ async def startup() -> None:
 
 
 async def shutdown() -> None:
-    """Close the persistent HTTP client and clear the agent card cache.
-    Call at application shutdown."""
     global _http_client, _client_cache
     if _http_client is not None:
         await _http_client.aclose()
@@ -37,7 +33,6 @@ async def shutdown() -> None:
 
 
 def _require_http() -> httpx.AsyncClient:
-    """Return the module-level client or raise clearly if startup was skipped."""
     if _http_client is None:
         raise RuntimeError(
             "A2A HTTP client is not initialised. "
@@ -47,12 +42,6 @@ def _require_http() -> httpx.AsyncClient:
 
 
 async def _get_a2a_client(agent_url: str) -> A2AClient:
-    """Build or reuse an A2AClient for a remote agent.
-
-    Uses AgentCard discovery via A2ACardResolver.  The underlying
-    httpx.AsyncClient is the persistent module-level instance so
-    cached clients remain valid across calls.
-    """
     if agent_url in _client_cache:
         return _client_cache[agent_url]
 
@@ -82,17 +71,6 @@ async def call_remote_agent(
     question: str,
     timeout: float = DEFAULT_TIMEOUT,
 ) -> str:
-    """
-    Send a question to a remote A2A agent and return its text answer.
-
-    Steps:
-    1. Fetch the remote AgentCard from {agent_url}/.well-known/agent.json
-    2. Send a blocking A2A message (3 attempts with exponential backoff)
-    3. Extract and return the first text part from the response
-
-    Returns a descriptive error string on unrecoverable failure —
-    callers should handle this gracefully.
-    """
     if not agent_url:
         raise ValueError("agent_url must not be empty")
 

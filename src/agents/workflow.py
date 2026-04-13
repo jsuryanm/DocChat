@@ -36,9 +36,6 @@ class AgentWorkflow:
 
         self.graph = self._build()
 
-    # ------------------------------------------------------------------
-    # Graph construction
-    # ------------------------------------------------------------------
 
     def _build(self):
         g = StateGraph(AgentState)
@@ -176,12 +173,6 @@ class AgentWorkflow:
             state["draft_answer"], state["reranked_docs"]
         )
 
-        # FIX: distinguish a tool/LLM failure from a genuine "not grounded"
-        # result.  VerificationAgent.check() returns supported="UNKNOWN" when
-        # the underlying LLM call fails (e.g. LengthFinishReasonError, timeout,
-        # network error).  In that case we set verification_failed=True so
-        # _route_after_verify can short-circuit to "accept" without triggering
-        # a content-quality retry loop that would discard a valid answer.
         supported = result.get("supported", "UNKNOWN")
         if supported == "UNKNOWN":
             logger.warning(
@@ -206,8 +197,6 @@ class AgentWorkflow:
         retries = state.get("retry_count", 0) + 1
         return {
             "retry_count": retries,
-            # FIX: reset verification_failed so a fresh verify attempt on the
-            # next pass starts clean and isn't incorrectly short-circuited.
             "verification_failed": False,
             "reasoning_steps": [f"Retry attempt {retries}"],
         }
@@ -256,9 +245,6 @@ class AgentWorkflow:
             "reasoning_steps": ["Final answer accepted"],
         }
 
-    # ------------------------------------------------------------------
-    # Routing
-    # ------------------------------------------------------------------
 
     def _route_after_rerank(self, state):
         """Delegate via A2A if no documents were retrieved locally."""
@@ -301,8 +287,6 @@ class AgentWorkflow:
             logger.info(f"Delegated answer — skipping retry | grounded={grounded} quality={quality}")
             return "accept"
 
-        # ADD THIS: web search answers have no local docs to verify against,
-        # so grounded=False is expected — accept and move on
         if state.get("web_used"):
             logger.info("Web search answer — skipping retry, accepting")
             return "accept"

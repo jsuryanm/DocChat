@@ -93,11 +93,6 @@ class VerificationAgent:
 
         self.chain = prompt | llm.with_structured_output(VerificationResult)
 
-    # FIX: exclude LengthFinishReasonError from the retry predicate.
-    # Previously the bare @retry caught every exception including token-limit
-    # errors, causing three identical failing attempts (each burning TIMEOUT
-    # seconds) before surfacing a RetryError.  Now token-limit errors are
-    # re-raised immediately so the caller can handle them in one place.
     @retry(
         stop=stop_after_attempt(3),
         wait=wait_exponential(min=1, max=8),
@@ -120,8 +115,6 @@ class VerificationAgent:
             result = await self._call_llm({"answer": answer, "context": context})
 
         except Exception as e:
-            # FIX: distinguish token-limit failures from other errors so
-            # callers can act accordingly (see workflow._verify).
             if LengthFinishReasonError is not None and isinstance(e, LengthFinishReasonError):
                 logger.warning(
                     "VerificationAgent: token limit reached — returning UNKNOWN. "

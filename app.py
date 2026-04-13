@@ -14,13 +14,11 @@ from src.retriever.builder import RetrieverBuilder
 from src.agents.workflow import AgentWorkflow
 from src.config.settings import settings
 
-# ── Page config ───────────────────────────────────────────────────────────────
 st.set_page_config(
     page_title="DocChat",
     layout="wide",
 )
 
-# ── Session state defaults ────────────────────────────────────────────────────
 _DEFAULTS = {
     "workflow": None,
     "builder": None,
@@ -34,7 +32,6 @@ for k, v in _DEFAULTS.items():
         st.session_state[k] = v
 
 
-# ── Infrastructure startup (once per session) ─────────────────────────────────
 async def _ensure_infra():
     if not st.session_state.infra_ready:
         await mcp_startup()
@@ -44,7 +41,6 @@ async def _ensure_infra():
 asyncio.run(_ensure_infra())
 
 
-# ── Helpers ───────────────────────────────────────────────────────────────────
 async def _index_files(uploaded_files):
     incoming = sorted(f.name for f in uploaded_files)
     if incoming == sorted(st.session_state.indexed_files):
@@ -81,9 +77,8 @@ async def _run_pipeline(question: str) -> dict:
     return await st.session_state.workflow.run(question)
 
 
-# ── Sidebar ───────────────────────────────────────────────────────────────────
 with st.sidebar:
-    st.header("⚙️ System Status")
+    st.header("System Status")
     mcp_status = "Ready" if st.session_state.infra_ready else "Starting"
     a2a_status = "Ready" if st.session_state.infra_ready else "Starting"
     st.write(f"MCP tools: {mcp_status}")
@@ -125,7 +120,6 @@ with st.sidebar:
             st.rerun()
 
 
-# ── Main area ─────────────────────────────────────────────────────────────────
 st.title("DocChat — Agentic RAG")
 st.caption("Upload documents in the sidebar, then ask questions below.")
 
@@ -136,12 +130,10 @@ if not st.session_state.messages:
     else:
         st.info("Documents indexed. Ask a question below!")
 
-# ── Render existing chat messages ─────────────────────────────────────────────
 for msg in st.session_state.messages:
     with st.chat_message(msg["role"]):
         st.write(msg["content"])
 
-        # Show metadata only for assistant messages
         if msg["role"] == "assistant" and msg.get("meta"):
             meta = msg["meta"]
 
@@ -161,7 +153,6 @@ for msg in st.session_state.messages:
                     for i, draft in enumerate(meta["draft_history"], 1):
                         st.write(f"Draft {i}: {draft}")
 
-# ── Chat input ────────────────────────────────────────────────────────────────
 if prompt := st.chat_input(
     "Ask a question about your documents...",
     disabled=not st.session_state.indexed_files,

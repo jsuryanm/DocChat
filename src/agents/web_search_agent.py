@@ -1,4 +1,3 @@
-# src/agents/web_search_agent.py
 from typing import Dict
 
 from langchain_openai import ChatOpenAI

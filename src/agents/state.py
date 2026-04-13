@@ -22,10 +22,6 @@ class AgentState(TypedDict):
     retry_count: int
     failure_reason: str
 
-    # FIX: added verification_failed.
-    # Distinguishes a tool/LLM failure inside the verify node from a genuine
-    # "answer is not grounded" result.  When True, _route_after_verify shorts
-    # to "accept" immediately so the retry loop is never triggered by a crash.
     verification_failed: bool
 
     draft_history: Annotated[List[str], operator.add]
@@ -33,9 +29,6 @@ class AgentState(TypedDict):
 
     # MCP
     tool_calls: List[Dict[str, Any]]
-    # FIX: renamed from mcp_tool_call_results → mcp_tool_results to match
-    # the key written in AgentWorkflow.run() initial state.  The mismatch was
-    # a latent KeyError waiting to surface under certain LangGraph reducer paths.
     mcp_tool_results: Annotated[List[str], operator.add]
     web_used: bool  # True when Tavily web search was used
     # A2A
